@@ -6,6 +6,36 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = await Promise.resolve(params);
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+    }
+
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+    const subscription = await prisma.subscription.findFirst({
+      where: { id, householdId: household.id },
+    });
+
+    if (!subscription) {
+      return NextResponse.json({ error: { message: "Subscription not found" } }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: subscription });
+  } catch (error) {
+    console.error("GET /api/subscriptions/[id] error:", error);
+    return NextResponse.json(
+      { error: { message: "Failed to fetch subscription" } },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }

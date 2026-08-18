@@ -5,6 +5,40 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = await Promise.resolve(params);
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+    }
+
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        id,
+        account: { householdId: household.id },
+      },
+      include: { account: true, category: true },
+    });
+
+    if (!transaction) {
+      return NextResponse.json({ error: { message: "Transaction not found" } }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: transaction });
+  } catch (error) {
+    console.error("GET /api/transactions/[id] error:", error);
+    return NextResponse.json(
+      { error: { message: "Failed to fetch transaction" } },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }

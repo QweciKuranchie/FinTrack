@@ -6,6 +6,36 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = await Promise.resolve(params);
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+    }
+
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+    const investment = await prisma.investment.findFirst({
+      where: { id, householdId: household.id },
+    });
+
+    if (!investment) {
+      return NextResponse.json({ error: { message: "Investment holding not found" } }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: investment });
+  } catch (error) {
+    console.error("GET /api/investments/[id] error:", error);
+    return NextResponse.json(
+      { error: { message: "Failed to fetch investment holding" } },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
