@@ -6,8 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Search } from "lucide-react";
+import { Plus, Trash2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Search, Upload } from "lucide-react";
 import { QuickTransactionModal } from "@/components/transactions/quick-transaction-modal";
+import { CsvImportModal } from "@/components/transactions/csv-import-modal";
 
 interface Transaction {
   id: string;
@@ -23,6 +24,7 @@ interface Transaction {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [selectedType, setSelectedType] = useState("");
@@ -83,12 +85,21 @@ export default function TransactionsPage() {
             Log and review your incoming and outgoing payments
           </p>
         </div>
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-sm"
-        >
-          <Plus className="h-4 w-4 mr-2" /> Log Transaction
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsCsvModalOpen(true)}
+            className="shadow-sm"
+          >
+            <Upload className="h-4 w-4 mr-2" /> Import CSV
+          </Button>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-sm"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Log Transaction
+          </Button>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -224,6 +235,14 @@ export default function TransactionsPage() {
       <QuickTransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={() => refetch()}
+        accounts={accounts}
+      />
+
+      {/* CSV Import Modal */}
+      <CsvImportModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
         onSuccess={() => refetch()}
         accounts={accounts}
       />

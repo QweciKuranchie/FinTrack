@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser, getOrCreateHouseholdForUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getCachedFxRates, convertCurrency } from "@/lib/fx";
 import Decimal from "decimal.js";
 
 export const dynamic = "force-dynamic";
@@ -15,39 +16,46 @@ export async function GET() {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
 
+    // Fetch FX rates map for cross-currency conversion
+    const fxRates = await getCachedFxRates();
+
     // Fetch accounts
     const accounts = await prisma.account.findMany({
       where: { householdId: household.id, isArchived: false },
       orderBy: { createdAt: "asc" },
     });
 
-    // Calculate total accounts balance
-    let totalAccountsBalance = new Decimal(0);
+    // Calculate total accounts balance in GHS
+    let totalAccountsBalanceGhs = new Decimal(0);
     accounts.forEach((acc) => {
-      totalAccountsBalance = totalAccountsBalance.plus(acc.currentBalance.toString());
+      const ghsValue = convertCurrency(acc.currentBalance.toString(), acc.currency, "GHS", fxRates);
+      totalAccountsBalanceGhs = totalAccountsBalanceGhs.plus(ghsValue);
     });
 
-    // Fetch assets & liabilities
+    // Fetch assets & convert to GHS
     const assets = await prisma.asset.findMany({
       where: { householdId: household.id },
     });
-    let totalAssets = new Decimal(0);
+    let totalAssetsGhs = new Decimal(0);
     assets.forEach((ast) => {
-      totalAssets = totalAssets.plus(ast.currentValue.toString());
+      const ghsValue = convertCurrency(ast.currentValue.toString(), ast.currency, "GHS", fxRates);
+      totalAssetsGhs = totalAssetsGhs.plus(ghsValue);
     });
 
+    // Fetch liabilities & convert to GHS
     const liabilities = await prisma.liability.findMany({
       where: { householdId: household.id },
     });
-    let totalLiabilities = new Decimal(0);
+    let totalLiabilitiesGhs = new Decimal(0);
     liabilities.forEach((liab) => {
-      totalLiabilities = totalLiabilities.plus(liab.currentBalance.toString());
+      const ghsValue = convertCurrency(liab.currentBalance.toString(), liab.currency, "GHS", fxRates);
+      totalLiabilitiesGhs = totalLiabilitiesGhs.plus(ghsValue);
     });
 
-    // Net worth = accounts balance + assets - liabilities
-    const netWorth = totalAccountsBalance.plus(totalAssets).minus(totalLiabilities);
+    // Net worth (GHS) = accounts balance + assets - liabilities
+    const netWorthGhs = totalAccountsBalanceGhs.plus(totalAssetsGhs).minus(totalLiabilitiesGhs);
 
-    // Calculate this month's spending
+    // Calculate this month's spending in GHS
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -63,9 +71,10 @@ export async function GET() {
       },
     });
 
-    let thisMonthSpend = new Decimal(0);
+    let thisMonthSpendGhs = new Decimal(0);
     monthTransactions.forEach((txn) => {
-      thisMonthSpend = thisMonthSpend.plus(txn.amount.toString());
+      const ghsValue = convertCurrency(txn.amount.toString(), txn.currency, "GHS", fxRates);
+      thisMonthSpendGhs = thisMonthSpendGhs.plus(ghsValue);
     });
 
     // Fetch upcoming subscriptions renewing in next 7 days
@@ -87,14 +96,15 @@ export async function GET() {
 
     return NextResponse.json({
       data: {
-        netWorth: netWorth.toNumber(),
-        totalAccountsBalance: totalAccountsBalance.toNumber(),
-        totalAssets: totalAssets.toNumber(),
-        totalLiabilities: totalLiabilities.toNumber(),
-        thisMonthSpend: thisMonthSpend.toNumber(),
+        netWorth: netWorthGhs.toNumber(),
+        totalAccountsBalance: totalAccountsBalanceGhs.toNumber(),
+        totalAssets: totalAssetsGhs.toNumber(),
+        totalLiabilities: totalLiabilitiesGhs.toNumber(),
+        thisMonthSpend: thisMonthSpendGhs.toNumber(),
         accounts: accounts.map((acc) => ({
           ...acc,
           currentBalance: Number(acc.currentBalance),
+          ghsEquivalent: convertCurrency(acc.currentBalance.toString(), acc.currency, "GHS", fxRates).toNumber(),
         })),
         upcomingSubscriptions: upcomingSubscriptions.map((sub) => ({
           ...sub,
