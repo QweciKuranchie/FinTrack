@@ -3,12 +3,15 @@ import { getAuthUser, getOrCreateHouseholdForUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+type RouteContext = {
+  params: Promise<{ id: string }> | { id: string };
+};
+
+export async function GET(request: Request, props: RouteContext) {
   try {
+    const params = await props.params;
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -43,11 +46,9 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, props: RouteContext) {
   try {
+    const params = await props.params;
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -84,11 +85,9 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: RouteContext) {
   try {
+    const params = await props.params;
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -103,7 +102,6 @@ export async function DELETE(
       return NextResponse.json({ error: { message: "Account not found" } }, { status: 404 });
     }
 
-    // Soft delete / archive
     await prisma.account.update({
       where: { id: params.id },
       data: { isArchived: true },
