@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Household {
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  members       HouseholdMember[]
+  accounts      Account[]
+  categories    Category[]
+  liabilities   Liability[]
+  assets        Asset[]
+  subscriptions Subscription[]
+  budgets       Budget[]
+  snapshots     NetWorthSnapshot[]
+}
+
+model HouseholdMember {
+  id          String   @id @default(uuid())
+  householdId String
+  userId      String   // Supabase auth.users.id
+  role        Role     @default(OWNER)
+  joinedAt    DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
+
+  @@unique([householdId, userId])
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+model Account {
+  id             String      @id @default(uuid())
+  householdId    String
+  ownerId        String      // Supabase user id
+  name           String
+  type           AccountType
+  currency       String      // ISO 4217, e.g. "GHS", "USD"
+  currentBalance Decimal     @default(0)
+  institution    String?
+  isArchived     Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+
+  household    Household     @relation(fields: [householdId], references: [id])
+  transactions Transaction[]
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  MOBILE_MONEY
+  CASH
+  INVESTMENT
+  OTHER
+}
+
+model Category {
+  id          String       @id @default(uuid())
+  householdId String?      // null = system default category
+  name        String
+  type        CategoryType
+  icon        String?
+  color       String?
+  parentId    String?
+
+  household    Household?    @relation(fields: [householdId], references: [id])
+  transactions Transaction[]
+  budgets      Budget[]
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id                String    @id @default(uuid())
+  accountId         String
+  categoryId        String?
+  amount            Decimal
+  currency          String
+  type              TxnType
+  description       String?
+  date              DateTime
+  source            TxnSource @default(MANUAL)
+  transferAccountId String?
+  createdAt         DateTime  @default(now())
+
+  account  Account   @relation(fields: [accountId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([accountId, date])
+  @@index([categoryId, date])
+}
+
+enum TxnType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum TxnSource {
+  MANUAL
+  CSV_IMPORT
+}
+
+model Liability {
+  id             String        @id @default(uuid())
+  householdId    String
+  name           String
+  type           LiabilityType
+  principal      Decimal
+  currentBalance Decimal
+  interestRate   Decimal?
+  minimumPayment Decimal?
+  dueDate        Int?          // day of month
+  currency       String
+  createdAt      DateTime      @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+enum LiabilityType {
+  LOAN
+  CREDIT_CARD
+  MORTGAGE
+  OTHER
+}
+
+model Asset {
+  id           String    @id @default(uuid())
+  householdId  String
+  name         String
+  type         AssetType
+  currentValue Decimal
+  currency     String
+  lastValuedAt DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+enum AssetType {
+  PROPERTY
+  VEHICLE
+  INVESTMENT
+  OTHER
+}
+
+model Investment {
+  id           String   @id @default(uuid())
+  householdId  String
+  accountId    String?
+  symbol       String
+  name         String
+  quantity     Decimal
+  avgCost      Decimal
+  currentPrice Decimal
+  currency     String
+  assetClass   String?  // "stock", "crypto", "etf", etc.
+  updatedAt    DateTime @updatedAt
+}
+
+model Subscription {
+  id                 String       @id @default(uuid())
+  householdId        String
+  name               String
+  amount             Decimal
+  currency           String
+  billingCycle       BillingCycle
+  nextRenewalDate    DateTime
+  categoryId         String?
+  isActive           Boolean      @default(true)
+  reminderDaysBefore Int          @default(3)
+  createdAt          DateTime     @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+enum BillingCycle {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model Budget {
+  id          String   @id @default(uuid())
+  householdId String
+  categoryId  String
+  amount      Decimal
+  currency    String   @default("GHS")
+  periodStart DateTime // first day of month this budget applies to
+
+  household Household @relation(fields: [householdId], references: [id])
+  category  Category  @relation(fields: [categoryId], references: [id])
+
+  @@unique([householdId, categoryId, periodStart])
+}
+
+model NetWorthSnapshot {
+  id               String   @id @default(uuid())
+  householdId      String
+  date             DateTime
+  totalAssets      Decimal
+  totalLiabilities Decimal
+  netWorth         Decimal
+  currency         String   @default("GHS")
+
+  household Household @relation(fields: [householdId], references: [id])
+
+  @@unique([householdId, date])
+}
+
+model FxRate {
+  id             String   @id @default(uuid())
+  baseCurrency   String
+  targetCurrency String
+  rate           Decimal
+  fetchedAt      DateTime @default(now())
+
+  @@unique([baseCurrency, targetCurrency])
+}
+
+model CsvImportLog {
+  id        String   @id @default(uuid())
+  accountId String
+  filename  String
+  rowCount  Int
+  status    String   // "success", "partial", "failed"
+  createdAt DateTime @default(now())
+}
