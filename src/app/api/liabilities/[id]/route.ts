@@ -6,13 +6,12 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
-};
-
-export async function PATCH(request: Request, props: RouteContext) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -20,7 +19,7 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existingLiability = await prisma.liability.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingLiability) {
@@ -29,13 +28,14 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const json = await request.json();
     const updatedLiability = await prisma.liability.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: json.name ?? existingLiability.name,
         type: json.type ?? existingLiability.type,
+        principal: json.principal !== undefined ? new Prisma.Decimal(json.principal) : existingLiability.principal,
         currentBalance: json.currentBalance !== undefined ? new Prisma.Decimal(json.currentBalance) : existingLiability.currentBalance,
-        interestRate: json.interestRate !== undefined ? new Prisma.Decimal(json.interestRate) : existingLiability.interestRate,
-        minimumPayment: json.minimumPayment !== undefined ? new Prisma.Decimal(json.minimumPayment) : existingLiability.minimumPayment,
+        interestRate: json.interestRate !== undefined ? (json.interestRate ? new Prisma.Decimal(json.interestRate) : null) : existingLiability.interestRate,
+        minimumPayment: json.minimumPayment !== undefined ? (json.minimumPayment ? new Prisma.Decimal(json.minimumPayment) : null) : existingLiability.minimumPayment,
         dueDate: json.dueDate !== undefined ? json.dueDate : existingLiability.dueDate,
         currency: json.currency ?? existingLiability.currency,
       },
@@ -51,9 +51,12 @@ export async function PATCH(request: Request, props: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, props: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -61,7 +64,7 @@ export async function DELETE(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existingLiability = await prisma.liability.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingLiability) {
@@ -69,7 +72,7 @@ export async function DELETE(request: Request, props: RouteContext) {
     }
 
     await prisma.liability.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ data: { success: true } });

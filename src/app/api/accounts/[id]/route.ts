@@ -5,13 +5,12 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
-};
-
-export async function GET(request: Request, props: RouteContext) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -20,7 +19,7 @@ export async function GET(request: Request, props: RouteContext) {
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const account = await prisma.account.findFirst({
       where: {
-        id: params.id,
+        id,
         householdId: household.id,
       },
       include: {
@@ -46,9 +45,12 @@ export async function GET(request: Request, props: RouteContext) {
   }
 }
 
-export async function PATCH(request: Request, props: RouteContext) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -58,7 +60,7 @@ export async function PATCH(request: Request, props: RouteContext) {
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
 
     const existingAccount = await prisma.account.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingAccount) {
@@ -66,7 +68,7 @@ export async function PATCH(request: Request, props: RouteContext) {
     }
 
     const updatedAccount = await prisma.account.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: json.name ?? existingAccount.name,
         type: json.type ?? existingAccount.type,
@@ -85,9 +87,12 @@ export async function PATCH(request: Request, props: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, props: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -95,7 +100,7 @@ export async function DELETE(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existingAccount = await prisma.account.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingAccount) {
@@ -103,7 +108,7 @@ export async function DELETE(request: Request, props: RouteContext) {
     }
 
     await prisma.account.update({
-      where: { id: params.id },
+      where: { id },
       data: { isArchived: true },
     });
 

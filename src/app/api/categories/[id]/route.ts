@@ -5,13 +5,12 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
-};
-
-export async function PATCH(request: Request, props: RouteContext) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -19,7 +18,7 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existing = await prisma.category.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existing) {
@@ -28,7 +27,7 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const json = await request.json();
     const updated = await prisma.category.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: json.name ?? existing.name,
         icon: json.icon ?? existing.icon,
@@ -46,9 +45,12 @@ export async function PATCH(request: Request, props: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, props: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -56,7 +58,7 @@ export async function DELETE(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existing = await prisma.category.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existing) {
@@ -64,7 +66,7 @@ export async function DELETE(request: Request, props: RouteContext) {
     }
 
     await prisma.category.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ data: { success: true } });

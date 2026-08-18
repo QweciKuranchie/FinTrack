@@ -6,13 +6,12 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
-};
-
-export async function PATCH(request: Request, props: RouteContext) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -20,7 +19,7 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existingAsset = await prisma.asset.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingAsset) {
@@ -29,13 +28,13 @@ export async function PATCH(request: Request, props: RouteContext) {
 
     const json = await request.json();
     const updatedAsset = await prisma.asset.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: json.name ?? existingAsset.name,
         type: json.type ?? existingAsset.type,
         currentValue: json.currentValue !== undefined ? new Prisma.Decimal(json.currentValue) : existingAsset.currentValue,
         currency: json.currency ?? existingAsset.currency,
-        lastValuedAt: json.currentValue !== undefined ? new Date() : existingAsset.lastValuedAt,
+        lastValuedAt: json.lastValuedAt ? new Date(json.lastValuedAt) : new Date(),
       },
     });
 
@@ -49,9 +48,12 @@ export async function PATCH(request: Request, props: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, props: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -59,7 +61,7 @@ export async function DELETE(request: Request, props: RouteContext) {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const existingAsset = await prisma.asset.findFirst({
-      where: { id: params.id, householdId: household.id },
+      where: { id, householdId: household.id },
     });
 
     if (!existingAsset) {
@@ -67,7 +69,7 @@ export async function DELETE(request: Request, props: RouteContext) {
     }
 
     await prisma.asset.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ data: { success: true } });

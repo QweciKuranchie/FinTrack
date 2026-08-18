@@ -5,13 +5,12 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
-};
-
-export async function DELETE(request: Request, props: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await props.params;
+    const { id } = await Promise.resolve(params);
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -21,9 +20,10 @@ export async function DELETE(request: Request, props: RouteContext) {
 
     const transaction = await prisma.transaction.findFirst({
       where: {
-        id: params.id,
+        id,
         account: { householdId: household.id },
       },
+      include: { account: true },
     });
 
     if (!transaction) {
@@ -31,33 +31,19 @@ export async function DELETE(request: Request, props: RouteContext) {
     }
 
     await prisma.$transaction(async (tx) => {
-      const amount = transaction.amount;
+      // Revert account balance adjustment
+      const isExpenseOrTransfer = transaction.type === "EXPENSE" || transaction.type === "TRANSFER";
+      const balanceChange = isExpenseOrTransfer ? transaction.amount : transaction.amount.negated();
 
-      if (transaction.type === "EXPENSE") {
-        await tx.account.update({
-          where: { id: transaction.accountId },
-          data: { currentBalance: { increment: amount } },
-        });
-      } else if (transaction.type === "INCOME") {
-        await tx.account.update({
-          where: { id: transaction.accountId },
-          data: { currentBalance: { decrement: amount } },
-        });
-      } else if (transaction.type === "TRANSFER") {
-        await tx.account.update({
-          where: { id: transaction.accountId },
-          data: { currentBalance: { increment: amount } },
-        });
-        if (transaction.transferAccountId) {
-          await tx.account.update({
-            where: { id: transaction.transferAccountId },
-            data: { currentBalance: { decrement: amount } },
-          });
-        }
-      }
+      await tx.account.update({
+        where: { id: transaction.accountId },
+        data: {
+          currentBalance: { increment: balanceChange },
+        },
+      });
 
       await tx.transaction.delete({
-        where: { id: params.id },
+        where: { id },
       });
     });
 
