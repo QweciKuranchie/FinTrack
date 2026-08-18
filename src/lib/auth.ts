@@ -2,17 +2,22 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 export async function getAuthUser() {
-  const supabase = createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (error || !user) {
+    if (error || !user) {
+      return null;
+    }
+
+    return user;
+  } catch (err) {
+    console.warn("getAuthUser error (e.g. build time or missing credentials):", err);
     return null;
   }
-
-  return user;
 }
 
 export async function requireAuthUser() {
