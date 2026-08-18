@@ -8,10 +8,15 @@ export const revalidate = 0;
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
+    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json({ error: { message: "Investment ID is required" } }, { status: 400 });
+    }
+
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -38,10 +43,15 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
+    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json({ error: { message: "Investment ID is required" } }, { status: 400 });
+    }
+
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
@@ -82,10 +92,15 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
+    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json({ error: { message: "Investment ID is required" } }, { status: 400 });
+    }
+
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
