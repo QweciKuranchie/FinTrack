@@ -1,13 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CreditCard, Plus, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { useState } from "react";
 import { QuickTransactionModal } from "@/components/transactions/quick-transaction-modal";
+import { SpendingCategoryChart, SpendingTrendChart } from "@/components/charts/spending-chart";
 
 interface Account {
   id: string;
@@ -59,7 +60,17 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: spendingAnalytics } = useQuery({
+    queryKey: ["spending-analytics"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/spending");
+      if (!res.ok) throw new Error("Failed to fetch spending analytics");
+      return res.json();
+    },
+  });
+
   const summary = dashboardData?.data;
+  const analytics = spendingAnalytics?.data;
 
   return (
     <div className="space-y-6">
@@ -141,6 +152,29 @@ export default function DashboardPage() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* Spending Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Spending by Category</CardTitle>
+            <CardDescription className="text-xs">Category breakdown for recent expenses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SpendingCategoryChart categoryData={analytics?.byCategory ?? []} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">6-Month Spending Trend</CardTitle>
+            <CardDescription className="text-xs">Monthly expense totals over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SpendingTrendChart monthlyData={analytics?.monthlyTrend ?? []} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Account Balances Grid */}
       <div>

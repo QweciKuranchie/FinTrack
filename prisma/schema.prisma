@@ -22,6 +22,7 @@ model Household {
   subscriptions Subscription[]
   budgets       Budget[]
   snapshots     NetWorthSnapshot[]
+  savingsGoals  SavingsGoal[]
 }
 
 model HouseholdMember {
@@ -55,6 +56,7 @@ model Account {
 
   household    Household     @relation(fields: [householdId], references: [id])
   transactions Transaction[]
+  savingsGoals SavingsGoal[]
 }
 
 enum AccountType {
@@ -239,4 +241,19 @@ model CsvImportLog {
   rowCount  Int
   status    String   // "success", "partial", "failed"
   createdAt DateTime @default(now())
+}
+
+model SavingsGoal {
+  id            String    @id @default(uuid())
+  householdId   String
+  accountId     String?
+  name          String
+  targetAmount  Decimal
+  currentAmount Decimal   @default(0)
+  deadline      DateTime?
+  currency      String    @default("GHS")
+  createdAt     DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
+  account   Account?  @relation(fields: [accountId], references: [id])
 }

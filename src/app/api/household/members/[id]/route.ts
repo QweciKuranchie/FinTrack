@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { getAuthUser, getOrCreateHouseholdForUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type RouteContext = {
+  params: Promise<{ id: string }> | { id: string };
+};
+
+export async function DELETE(request: Request, props: RouteContext) {
+  try {
+    const params = await props.params;
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
+    }
+
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+    const member = await prisma.householdMember.findFirst({
+      where: { id: params.id, householdId: household.id },
+    });
+
+    if (!member) {
+      return NextResponse.json({ error: { message: "Member not found" } }, { status: 404 });
+    }
+
+    // Protect against deleting the household creator
+    if (member.role === "OWNER" && member.userId === user.id) {
+      return NextResponse.json(
+        { error: { message: "Cannot remove household owner" } },
+        { status: 400 }
+      );
+    }
+
+    await prisma.householdMember.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ data: { success: true } });
+  } catch (error) {
+    console.error("DELETE /api/household/members/[id] error:", error);
+    return NextResponse.json(
+      { error: { message: "Failed to remove household member" } },
+      { status: 500 }
+    );
+  }
+}

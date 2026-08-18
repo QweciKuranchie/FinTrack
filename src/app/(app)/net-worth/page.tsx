@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Home, Car, TrendingUp, ShieldAlert, DollarSign } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Home, Car, TrendingUp, ShieldAlert, DollarSign, Target, Briefcase } from "lucide-react";
+import { NetWorthTrendChart } from "@/components/charts/net-worth-chart";
 
 interface Asset {
   id: string;
@@ -45,6 +47,30 @@ interface NewLiabilityPayload {
   minimumPayment?: number | null;
   dueDate?: number | null;
   currency: string;
+}
+
+interface InvestmentHolding {
+  id: string;
+  symbol: string;
+  name: string;
+  quantity: number;
+  avgCost: number;
+  currentPrice: number;
+  currency: string;
+  totalCost: number;
+  currentValue: number;
+  gainLoss: number;
+  gainLossPercent: number;
+}
+
+interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  percentage: number;
+  currency: string;
+  deadline?: string | null;
 }
 
 export default function NetWorthPage() {
@@ -94,6 +120,33 @@ export default function NetWorthPage() {
     queryFn: async () => {
       const res = await fetch("/api/liabilities");
       if (!res.ok) throw new Error("Failed to fetch liabilities");
+      return res.json();
+    },
+  });
+
+  const { data: investmentsData } = useQuery<{ data: InvestmentHolding[] }>({
+    queryKey: ["investments"],
+    queryFn: async () => {
+      const res = await fetch("/api/investments");
+      if (!res.ok) throw new Error("Failed to fetch investments");
+      return res.json();
+    },
+  });
+
+  const { data: goalsData } = useQuery<{ data: SavingsGoal[] }>({
+    queryKey: ["goals"],
+    queryFn: async () => {
+      const res = await fetch("/api/goals");
+      if (!res.ok) throw new Error("Failed to fetch goals");
+      return res.json();
+    },
+  });
+
+  const { data: analyticsData } = useQuery({
+    queryKey: ["spending-analytics"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/spending");
+      if (!res.ok) throw new Error("Failed to fetch analytics");
       return res.json();
     },
   });
@@ -198,6 +251,9 @@ export default function NetWorthPage() {
   const summary = dashboardData?.data;
   const assets = assetsData?.data ?? [];
   const liabilities = liabilitiesData?.data ?? [];
+  const investments = investmentsData?.data ?? [];
+  const goals = goalsData?.data ?? [];
+  const netWorthTrend = analyticsData?.data?.netWorthTrend ?? [];
 
   const getAssetIcon = (type: string) => {
     switch (type) {
@@ -217,7 +273,7 @@ export default function NetWorthPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Net Worth & Assets</h1>
         <p className="text-sm text-muted-foreground">
-          Track non-liquid assets (property, vehicles) and liabilities (loans, mortgages)
+          Track non-liquid assets (property, vehicles), investment holdings, savings goals, and liabilities
         </p>
       </div>
 
@@ -252,6 +308,17 @@ export default function NetWorthPage() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Net Worth Historical Trend Chart Card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Net Worth Trend</CardTitle>
+          <CardDescription className="text-xs">Historical daily/weekly snapshot progress</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NetWorthTrendChart data={netWorthTrend} />
         </CardContent>
       </Card>
 
@@ -525,6 +592,88 @@ export default function NetWorthPage() {
                     {liab.interestRate ? ` • ${liab.interestRate}% APR` : ""}
                     {liab.minimumPayment ? ` • Min GHS ${liab.minimumPayment}/mo` : ""}
                   </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Investment Holdings Section */}
+      <div className="space-y-4 pt-4 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Investment Holdings</h2>
+            <p className="text-xs text-muted-foreground">Stocks, ETFs, crypto, and mutual funds gain/loss tracking</p>
+          </div>
+        </div>
+
+        {investments.length === 0 ? (
+          <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
+            No investment holdings added yet. Log individual stocks or crypto under Investments.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {investments.map((inv) => (
+              <Card key={inv.id} className="relative">
+                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-emerald-600" />
+                    <span className="font-semibold text-sm">{inv.symbol} ({inv.name})</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-1">
+                  <p className="text-xl font-bold text-foreground">
+                    {inv.currency} {inv.currentValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <div className="flex items-center justify-between text-xs mt-2 border-t pt-2">
+                    <span className="text-muted-foreground">Qty: {inv.quantity} @ {inv.currentPrice}</span>
+                    <span className={`font-semibold ${inv.gainLoss >= 0 ? "text-teal-600" : "text-destructive"}`}>
+                      {inv.gainLoss >= 0 ? "+" : ""}{inv.gainLossPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Savings Goals Section */}
+      <div className="space-y-4 pt-4 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Savings Goals</h2>
+            <p className="text-xs text-muted-foreground">Target savings milestones and deadline progress</p>
+          </div>
+        </div>
+
+        {goals.length === 0 ? (
+          <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
+            No active savings goals tracked yet. Set target savings amounts to monitor progress.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {goals.map((goal) => (
+              <Card key={goal.id}>
+                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-brand-teal" />
+                    <span className="font-semibold text-sm">{goal.name}</span>
+                  </div>
+                  <Badge variant="teal">{goal.percentage}%</Badge>
+                </CardHeader>
+                <CardContent className="p-4 pt-1 space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>GHS {goal.currentAmount.toFixed(2)} saved</span>
+                    <span>Target GHS {goal.targetAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-brand-teal transition-all duration-300"
+                      style={{ width: `${goal.percentage}%` }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ))}
