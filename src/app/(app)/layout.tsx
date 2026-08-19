@@ -60,7 +60,7 @@ const sidebarSections: NavSection[] = [
   {
     title: "FINANCIAL CATEGORY",
     items: [
-      { name: "Add Transaction", action: "ADD_EXPENSE", icon: CreditCard },
+      { name: "Transactions", href: "/transactions", icon: ArrowLeftRight },
       { name: "Expenses", href: "/expenses", icon: ArrowDownRight },
       { name: "Budget", href: "/budgets", icon: Wallet },
       { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
