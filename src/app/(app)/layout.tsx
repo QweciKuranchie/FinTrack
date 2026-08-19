@@ -137,18 +137,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const renderSidebarContent = () => (
-    <div className="flex h-full flex-col bg-brand-teal dark:bg-[#08332F] text-white">
+    <div className="flex h-full flex-col bg-card border-r border-border text-card-foreground">
       {/* Brand Header */}
-      <div className="flex h-16 items-center justify-between px-6 pt-2">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white">
-            <Wallet className="h-4 w-4" />
+      <div className="flex h-16 items-center justify-between px-6 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-teal/15 text-brand-teal dark:bg-brand-teal/25 dark:text-teal-300">
+            <Wallet className="h-5 w-5" />
           </div>
-          <span className="font-bold text-2xl tracking-tight text-white">FinTrack</span>
+          <span className="font-bold text-xl tracking-tight text-foreground">FinTrack</span>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(false)}
-          className="md:hidden text-white/80 hover:text-white p-1"
+          className="md:hidden text-muted-foreground hover:text-foreground p-1"
           aria-label="Close menu"
         >
           <X className="h-6 w-6" />
@@ -156,34 +156,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Household / Workspace Selector Pill & Dropdown */}
-      <div className="px-4 py-2 relative">
+      <div className="px-4 py-3 relative border-b border-border/40">
         <button
           onClick={() => setIsWorkspaceDropdownOpen((prev) => !prev)}
-          className="w-full flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-3.5 py-2.5 text-sm text-white font-medium shadow-sm transition-colors hover:bg-white/15 cursor-pointer"
+          className="w-full flex items-center justify-between rounded-xl bg-muted/60 border border-border px-3.5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
-            <User className="h-4 w-4 text-teal-100" />
+            <User className="h-4 w-4 text-brand-teal" />
             <span className="truncate max-w-[140px]">Personal Finance</span>
           </div>
           {isWorkspaceDropdownOpen ? (
-            <ChevronUp className="h-4 w-4 opacity-90 shrink-0" />
+            <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
           ) : (
-            <ChevronDown className="h-4 w-4 opacity-80 shrink-0" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
           )}
         </button>
 
-        {/* Workspace Dropdown Card matching reference screenshot */}
+        {/* Workspace Dropdown Card */}
         {isWorkspaceDropdownOpen && (
-          <div className="mt-2 rounded-xl bg-[#12181B] border border-white/10 p-1.5 shadow-2xl text-sm font-medium text-white space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
+          <div className="mt-2 rounded-xl bg-popover border border-border p-1.5 shadow-xl text-sm font-medium text-popover-foreground space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
             <button
               onClick={() => setIsWorkspaceDropdownOpen(false)}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-white hover:bg-white/10 transition-colors"
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted transition-colors text-foreground"
             >
-              <User className="h-4 w-4 text-white" />
+              <User className="h-4 w-4 text-brand-teal" />
               <span>Personal Finance</span>
             </button>
 
-            <div className="border-t border-white/10 my-1" />
+            <div className="border-t border-border my-1" />
 
             <Link
               href="/settings"
@@ -191,9 +191,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setIsWorkspaceDropdownOpen(false);
                 setIsMobileMenuOpen(false);
               }}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <Settings className="h-4 w-4 text-white/80" />
+              <Settings className="h-4 w-4" />
               <span>Manage Workspaces</span>
             </Link>
           </div>
@@ -201,10 +201,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Nav Sections Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4 scrollbar-thin scrollbar-thumb-white/20">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {sidebarSections.map((section) => (
           <div key={section.title} className="space-y-1">
-            <h3 className="px-3 text-[11px] font-bold uppercase tracking-wider text-teal-100/70 pt-2 pb-1">
+            <h3 className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 pt-2 pb-1">
               {section.title}
             </h3>
             {section.items.map((item) => {
@@ -216,9 +216,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <button
                     key={item.name}
                     onClick={() => handleItemClick(item)}
-                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-teal-50 hover:bg-white/10 hover:text-white transition-colors"
+                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
-                    <Icon className="h-4 w-4 text-teal-100" />
+                    <Icon className="h-4 w-4" />
                     <span>{item.name}</span>
                   </button>
                 );
@@ -232,11 +232,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[#182328] text-white shadow-md font-semibold"
-                      : "text-teal-50 hover:bg-white/10 hover:text-white"
+                      ? "bg-brand-teal text-white shadow-sm font-semibold"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4 text-teal-100" />
+                  <Icon className="h-4 w-4" />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -245,35 +245,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ))}
 
         {/* Footer Nav Links */}
-        <div className="pt-4 border-t border-white/10 space-y-1">
+        <div className="pt-4 border-t border-border/50 space-y-1">
           <Link
             href="/settings"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-teal-50 hover:bg-white/10 hover:text-white transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            <HelpCircle className="h-4 w-4 text-teal-100" />
+            <HelpCircle className="h-4 w-4" />
             <span>Help Center</span>
           </Link>
           <Link
             href="/settings"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-teal-50 hover:bg-white/10 hover:text-white transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            <Settings className="h-4 w-4 text-teal-100" />
+            <Settings className="h-4 w-4" />
             <span>Settings</span>
           </Link>
         </div>
       </div>
 
       {/* Logout Action Button */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-border/50">
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-[#FF5252] hover:bg-[#FF3838] text-white font-semibold py-3 px-4 shadow-md transition-all active:scale-98"
+          className="w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
         >
           <LogOut className="h-4 w-4" />
-          <span>{loggingOut ? "Logging out..." : "Logout"}</span>
+          <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
         </button>
       </div>
     </div>
@@ -282,23 +282,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Desktop Fixed Sidebar */}
-      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 shadow-xl">
+      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30">
         {renderSidebarContent()}
       </aside>
 
       {/* Mobile Header Bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-brand-teal dark:bg-[#08332F] text-white flex items-center justify-between px-4 z-40 shadow-md">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border text-foreground flex items-center justify-between px-4 z-40 shadow-xs">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-white"
+          className="p-1.5 rounded-lg hover:bg-muted text-foreground"
           aria-label="Open menu"
         >
           <Menu className="h-6 w-6" />
         </button>
-        <span className="font-bold text-xl tracking-tight">FinTrack</span>
+
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-teal/15 text-brand-teal">
+            <Wallet className="h-4 w-4" />
+          </div>
+          <span className="font-bold text-lg tracking-tight">FinTrack</span>
+        </div>
+
         <button
           onClick={() => setIsQuickAddOpen(true)}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-white"
+          className="p-1.5 rounded-lg hover:bg-muted text-brand-teal"
           aria-label="Add expense"
         >
           <Plus className="h-6 w-6" />
