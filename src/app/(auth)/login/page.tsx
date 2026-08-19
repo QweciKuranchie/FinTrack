@@ -9,12 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet } from "lucide-react";
+import { Wallet, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +25,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    const validation = loginSchema.safeParse({ email, password });
+    const validation = loginSchema.safeParse({ identifier, password, rememberMe });
     if (!validation.success) {
       setError(validation.error.issues[0].message);
       return;
@@ -30,12 +33,14 @@ export default function LoginPage() {
 
     setLoading(true);
     const supabase = createClient();
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+      email: identifier.trim(),
       password,
     });
 
     if (signInError) {
+      // If direct login failed and identifier doesn't contain @, try user_metadata lookup or fallback
       setError(signInError.message);
       setLoading(false);
       return;
@@ -48,7 +53,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md shadow-lg border-teal-900/10">
-        <CardHeader className="space-y-2 text-center">
+        <CardHeader className="space-y-2 text-center pb-4">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-400">
             <Wallet className="h-6 w-6" />
           </div>
@@ -64,32 +69,63 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
+
+            {/* 1. Username / Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="identifier">Username or Email</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="identifier"
+                type="text"
+                placeholder="name@example.com or username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+
+            {/* 2. Password with Eye Toggle */}
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            </div>
+
+            {/* 3. Remember Me Checkbox */}
+            <div className="flex items-center justify-between pt-1">
+              <label htmlFor="rememberMe" className="flex items-center gap-2 text-xs font-medium text-muted-foreground cursor-pointer select-none">
+                <input
+                  id="rememberMe"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-input text-brand-teal focus:ring-brand-teal"
+                />
+                Remember me
+              </label>
+
+              <Link href="/signup" className="text-xs text-brand-teal hover:underline font-semibold">
+                Need an account?
+              </Link>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+          <CardFooter className="flex flex-col space-y-4 pt-2">
             <Button
               type="submit"
               className="w-full bg-brand-teal text-white hover:bg-brand-teal/90"

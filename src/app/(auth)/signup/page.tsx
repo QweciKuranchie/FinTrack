@@ -9,13 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, CheckCircle2 } from "lucide-react";
+import { Wallet, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,7 +31,14 @@ export default function SignupPage() {
     setError(null);
     setInfoMsg(null);
 
-    const validation = signupSchema.safeParse({ email, password, confirmPassword });
+    const validation = signupSchema.safeParse({
+      fullName,
+      username,
+      email,
+      password,
+      confirmPassword,
+    });
+
     if (!validation.success) {
       setError(validation.error.issues[0].message);
       return;
@@ -36,6 +49,12 @@ export default function SignupPage() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: fullName,
+          username: username.toLowerCase().trim(),
+        },
+      },
     });
 
     if (signUpError) {
@@ -72,9 +91,9 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <Card className="w-full max-w-md shadow-lg border-teal-900/10">
-        <CardHeader className="space-y-2 text-center">
+        <CardHeader className="space-y-2 text-center pb-4">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-400">
             <Wallet className="h-6 w-6" />
           </div>
@@ -84,7 +103,7 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3.5">
             {error && (
               <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive dark:bg-destructive/30">
                 {error}
@@ -96,8 +115,36 @@ export default function SignupPage() {
                 <span>{infoMsg}</span>
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
+
+            {/* 1. Full Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="e.g. Richard Kuranchie"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* 2. Username */}
+            <div className="space-y-1.5">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="e.g. qweci"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* 3. Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -107,30 +154,56 @@ export default function SignupPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
+
+            {/* 4. Password with Eye Toggle */}
+            <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
+
+            {/* 5. Confirm Password with Eye Toggle */}
+            <div className="space-y-1.5">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+          <CardFooter className="flex flex-col space-y-4 pt-2">
             <Button
               type="submit"
               className="w-full bg-brand-teal text-white hover:bg-brand-teal/90"
