@@ -13,7 +13,6 @@ import {
   RefreshCw,
   LineChart,
   Scale,
-  Trophy,
   Users,
   Handshake,
   Landmark,
@@ -53,12 +52,13 @@ const sidebarSections: NavSection[] = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Compass },
       { name: "Statistics", href: "/statistics", icon: TrendingUp },
-      { name: "Add Transaction", action: "ADD_EXPENSE", icon: CreditCard },
+      { name: "Accounts", href: "/accounts", icon: Landmark },
     ],
   },
   {
     title: "FINANCIAL CATEGORY",
     items: [
+      { name: "Add Transaction", action: "ADD_EXPENSE", icon: CreditCard },
       { name: "Budget", href: "/budgets", icon: Wallet },
       { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
       { name: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
@@ -67,9 +67,10 @@ const sidebarSections: NavSection[] = [
   {
     title: "WEALTH",
     items: [
-      { name: "Investments", href: "/net-worth", icon: LineChart },
+      { name: "Assets", href: "/net-worth", icon: LineChart },
+      { name: "Liabilities", href: "/net-worth", icon: CreditCard },
       { name: "Net Worth", href: "/net-worth", icon: Scale },
-      { name: "Achievements", href: "/settings", icon: Trophy },
+      { name: "FX & Currencies", href: "/settings?tab=fx", icon: RefreshCw },
     ],
   },
   {

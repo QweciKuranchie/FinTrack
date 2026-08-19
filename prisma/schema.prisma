@@ -123,13 +123,16 @@ model Liability {
   id             String        @id @default(uuid())
   householdId    String
   name           String
-  type           LiabilityType
+  counterparty   String?
+  isReceivable   Boolean       @default(false)
+  type           LiabilityType @default(OTHER)
   principal      Decimal
   currentBalance Decimal
   interestRate   Decimal?
   minimumPayment Decimal?
   dueDate        Int?          // day of month
-  currency       String
+  currency       String        @default("GHS")
+  notes          String?
   createdAt      DateTime      @default(now())
 
   household Household @relation(fields: [householdId], references: [id])
