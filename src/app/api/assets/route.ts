@@ -7,20 +7,41 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
     }
 
-    const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const assets = await prisma.asset.findMany({
-      where: { householdId: household.id },
-      orderBy: { lastValuedAt: "desc" },
-    });
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const skip = (page - 1) * limit;
 
-    return NextResponse.json({ data: assets });
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+
+    const [assets, totalCount] = await Promise.all([
+      prisma.asset.findMany({
+        where: { householdId: household.id },
+        orderBy: { lastValuedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.asset.count({
+        where: { householdId: household.id },
+      }),
+    ]);
+
+    return NextResponse.json({
+      data: assets,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("GET /api/assets error:", error);
     return NextResponse.json(

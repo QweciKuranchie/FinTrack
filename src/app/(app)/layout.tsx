@@ -13,6 +13,7 @@ import {
   RefreshCw,
   LineChart,
   Scale,
+  PiggyBank,
   Users,
   Handshake,
   Landmark,
@@ -67,9 +68,10 @@ const sidebarSections: NavSection[] = [
   {
     title: "WEALTH",
     items: [
-      { name: "Assets", href: "/net-worth", icon: LineChart },
-      { name: "Liabilities", href: "/net-worth", icon: CreditCard },
+      { name: "Assets", href: "/assets", icon: LineChart },
+      { name: "Liabilities", href: "/liabilities", icon: CreditCard },
       { name: "Net Worth", href: "/net-worth", icon: Scale },
+      { name: "Savings", href: "/savings", icon: PiggyBank },
       { name: "FX & Currencies", href: "/settings?tab=fx", icon: RefreshCw },
     ],
   },
