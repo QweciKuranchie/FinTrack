@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   User,
   Sun,
@@ -20,7 +21,6 @@ import {
   Tag,
   Mail,
   FileText,
-  ShieldCheck,
   CheckCircle2,
   Camera,
   Settings2,
@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Save,
   Globe,
+  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -38,13 +39,6 @@ interface Category {
   type: "INCOME" | "EXPENSE";
   icon?: string | null;
   color?: string | null;
-}
-
-interface HouseholdMember {
-  id: string;
-  userId: string;
-  role: "OWNER" | "MEMBER";
-  joinedAt: string;
 }
 
 interface UserProfileData {
@@ -77,11 +71,6 @@ export default function SettingsPage() {
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState<"INCOME" | "EXPENSE">("EXPENSE");
   const [catColor, setCatColor] = useState("#0F766E");
-
-  // Workspace Member State
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"OWNER" | "MEMBER">("MEMBER");
-
   const [error, setError] = useState<string | null>(null);
 
   // Fetch User Profile
@@ -112,79 +101,7 @@ export default function SettingsPage() {
     },
   });
 
-  const { data: householdData } = useQuery<{
-    data: { household: { id: string; name: string; createdBy: string; createdAt: string }; members: HouseholdMember[] };
-  }>({
-    queryKey: ["household-members"],
-    queryFn: async () => {
-      const res = await fetch("/api/household/members");
-      if (!res.ok) throw new Error("Failed to fetch workspace info");
-      return res.json();
-    },
-  });
-
-  // Workspaces Query
-  const { data: workspacesData } = useQuery<{
-    data: Array<{ id: string; name: string; role: string; memberCount: number; isCurrentActive: boolean }>;
-  }>({
-    queryKey: ["workspaces"],
-    queryFn: async () => {
-      const res = await fetch("/api/workspaces");
-      if (!res.ok) throw new Error("Failed to fetch workspaces");
-      return res.json();
-    },
-  });
-
-  const [newWsInput, setNewWsInput] = useState("");
-
-  const createWsMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await fetch("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to create workspace");
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      setNewWsInput("");
-      setProfileSuccessMsg("New workspace created successfully.");
-    },
-  });
-
-  const switchWsMutation = useMutation({
-    mutationFn: async (workspaceId: string) => {
-      const res = await fetch("/api/workspaces/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to switch workspace");
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
-      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
-      setProfileSuccessMsg("Switched active workspace.");
-    },
-  });
-
   const categories = categoriesData?.data ?? [];
-  const householdInfo = householdData?.data;
-  const members = householdInfo?.members ?? [];
-  const allWorkspaces = workspacesData?.data ?? [];
 
   // Profile Save Mutation
   const updateProfileMutation = useMutation({
@@ -252,36 +169,6 @@ export default function SettingsPage() {
     onError: (err: Error) => setError(err.message),
   });
 
-  const inviteMemberMutation = useMutation({
-    mutationFn: async (payload: { email: string; role: "OWNER" | "MEMBER" }) => {
-      const res = await fetch("/api/household/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to invite workspace member");
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["household-members"] });
-      setInviteEmail("");
-      setProfileSuccessMsg("Workspace invitation sent successfully!");
-    },
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const removeMemberMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/household/members/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to remove member");
-      return data;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["household-members"] }),
-    onError: (err: Error) => setError(err.message),
-  });
-
   const triggerSnapshotMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/cron/net-worth-snapshot");
@@ -309,14 +196,6 @@ export default function SettingsPage() {
       name: catName,
       type: catType,
       color: catColor,
-    });
-  };
-
-  const handleInviteMember = (e: React.FormEvent) => {
-    e.preventDefault();
-    inviteMemberMutation.mutate({
-      email: inviteEmail,
-      role: inviteRole,
     });
   };
 
@@ -457,9 +336,7 @@ export default function SettingsPage() {
                       value={
                         profileResponse?.data?.workspaceCreatedAt
                           ? new Date(profileResponse.data.workspaceCreatedAt).toLocaleDateString()
-                          : householdInfo?.household?.createdAt
-                          ? new Date(householdInfo.household.createdAt).toLocaleDateString()
-                          : "---"
+                          : "Active Workspace"
                       }
                       className="bg-muted/40 font-mono text-xs"
                     />
@@ -778,184 +655,23 @@ export default function SettingsPage() {
       {/* TAB 4: Account and Data (Workspaces, Export, & Account Deletion) */}
       {activeTab === "account_data" && (
         <div className="space-y-6">
-          {/* Workspace Management & Creation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Settings2 className="h-5 w-5 text-brand-teal" /> Workspace Management & Creation
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Edit active workspace title or create custom isolated financial workspaces
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Form 1: Edit Active Workspace Title */}
-              <div className="space-y-3 border-b pb-4">
-                <Label htmlFor="manage-workspace-title">Edit Active Workspace Title</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    id="manage-workspace-title"
-                    placeholder="e.g. Personal Workspace or Business Finance"
-                    value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    required
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (!workspaceName.trim()) return;
-                      updateProfileMutation.mutate({
-                        name: fullName,
-                        username,
-                        workspaceName: workspaceName.trim(),
-                      });
-                    }}
-                    className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer"
-                    disabled={updateProfileMutation.isPending}
-                  >
-                    <Save className="h-4 w-4 mr-1.5" /> Save Workspace Title
-                  </Button>
-                </div>
-              </div>
-
-              {/* Form 2: Create New Workspace */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!newWsInput.trim()) return;
-                  createWsMutation.mutate(newWsInput.trim());
-                }}
-                className="space-y-3 border-b pb-4"
-              >
-                <Label htmlFor="create-new-ws-input">Create Brand New Workspace</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    id="create-new-ws-input"
-                    placeholder="e.g. Side Project, Family Budget"
-                    value={newWsInput}
-                    onChange={(e) => setNewWsInput(e.target.value)}
-                    required
-                    className="flex-1"
-                  />
-                  <Button
-                    type="submit"
-                    className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer"
-                    disabled={createWsMutation.isPending}
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" /> Create Workspace
-                  </Button>
-                </div>
-              </form>
-
-              {/* List 3: All Workspaces Owned & Joined */}
-              <div className="space-y-2 pt-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your Workspaces</h4>
-                <div className="divide-y border rounded-xl overflow-hidden">
-                  {allWorkspaces.map((ws) => (
-                    <div key={ws.id} className="p-3.5 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-foreground">{ws.name}</p>
-                          {ws.isCurrentActive && <Badge variant="teal" className="text-[10px]">Active</Badge>}
-                          <Badge variant="outline" className="text-[10px] uppercase">{ws.role}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {ws.memberCount} {ws.memberCount === 1 ? "member" : "members"}
-                        </p>
-                      </div>
-
-                      {!ws.isCurrentActive && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => switchWsMutation.mutate(ws.id)}
-                          disabled={switchWsMutation.isPending}
-                          className="h-8 text-xs gap-1 border-brand-teal/40 text-brand-teal hover:bg-brand-teal/10 cursor-pointer"
-                        >
-                          Switch To Workspace
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Workspaces & Team Sharing */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          {/* Shared Workspaces Navigation Card */}
+          <Card className="border-brand-teal/30 bg-teal-50/20 dark:bg-teal-950/10">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <CardTitle className="text-base font-bold">Workspace Team Sharing</CardTitle>
-                <CardDescription className="text-xs">
-                  Manage collaborators for active workspace ({workspaceName || householdInfo?.household?.name || "Personal Workspace"})
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-brand-teal" /> Multi-Workspace & Team Sharing Hub
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  All workspace switching, creation, deletion, and team collaborator management has been organized on the Shared Workspaces page
                 </CardDescription>
               </div>
-              <Badge variant="teal" className="text-xs">
-                Active: {workspaceName || householdInfo?.household?.name || "Personal Workspace"}
-              </Badge>
+              <Link href="/workspaces">
+                <Button className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer shadow-xs text-xs gap-1.5 shrink-0">
+                  <Users className="h-4 w-4" /> Go to Shared Workspaces →
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <form onSubmit={handleInviteMember} className="space-y-3 border-b pb-4">
-                <Label htmlFor="invite-email">Invite Collaborator to Active Workspace</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    placeholder="colleague@example.com"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    required
-                    className="flex-1"
-                  />
-                  <select
-                    className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value as "OWNER" | "MEMBER")}
-                  >
-                    <option value="MEMBER">Member (View & Add)</option>
-                    <option value="OWNER">Owner (Full Admin)</option>
-                  </select>
-                  <Button type="submit" size="sm" className="bg-brand-teal text-white hover:bg-brand-teal/90">
-                    <Mail className="h-4 w-4 mr-1" /> Send Invite
-                  </Button>
-                </div>
-              </form>
-
-              {/* Members List */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Workspace Members</h4>
-                <div className="divide-y border rounded-xl overflow-hidden">
-                  {members.map((m) => (
-                    <div key={m.id} className="p-3 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="h-4 w-4 text-brand-teal" />
-                        <div>
-                          <p className="font-semibold text-foreground">{m.userId}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            Joined {new Date(m.joinedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{m.role}</Badge>
-                        {m.role !== "OWNER" && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeMemberMutation.mutate(m.id)}
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
           </Card>
 
           {/* Data Export & Backups */}

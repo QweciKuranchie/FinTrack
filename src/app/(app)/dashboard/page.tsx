@@ -8,6 +8,7 @@ import {
   ArrowDownLeft,
   Calendar,
   Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,10 +51,12 @@ interface TransactionItem {
 }
 
 type TimeFilterOption = "ALL" | "THIS_MONTH" | "LAST_MONTH" | "LAST_7_DAYS" | "TODAY";
+type SortOption = "NEWEST" | "OLDEST" | "AMOUNT_HIGH" | "AMOUNT_LOW";
 
 export default function DashboardPage() {
-  // Time filter state: default "THIS_MONTH"
+  // Time filter & sorting state
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("THIS_MONTH");
+  const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
 
   const { data: dashboardData, isLoading } = useQuery<{ data: DashboardData }>({
     queryKey: ["dashboard-summary"],
@@ -124,6 +127,23 @@ export default function DashboardPage() {
     return true;
   });
 
+  // Sort transactions according to selected sorting option
+  const sortedTxns = [...filteredTxns].sort((a, b) => {
+    if (sortBy === "NEWEST") {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    }
+    if (sortBy === "OLDEST") {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }
+    if (sortBy === "AMOUNT_HIGH") {
+      return Number(b.amount) - Number(a.amount);
+    }
+    if (sortBy === "AMOUNT_LOW") {
+      return Number(a.amount) - Number(b.amount);
+    }
+    return 0;
+  });
+
   // Calculate filtered spending and income totals
   const filteredSpent = filteredTxns
     .filter((t) => t.type === "EXPENSE")
@@ -148,7 +168,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Right Header Action Controls: User Profile, Notifications, Dark/Light Toggle, Date Sorting */}
+        {/* Right Header Action Controls: Time Range & Sorting Dropdowns */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Dashboard Date Filter Dropdown */}
           <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-xs">
@@ -164,6 +184,22 @@ export default function DashboardPage() {
               <option value="LAST_7_DAYS">Last 7 days</option>
               <option value="LAST_MONTH">Last month</option>
               <option value="ALL">All</option>
+            </select>
+          </div>
+
+          {/* Dashboard Transaction Sorting Dropdown */}
+          <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-xs">
+            <ArrowUpDown className="h-3.5 w-3.5 text-brand-teal" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="bg-transparent text-xs font-semibold cursor-pointer outline-hidden focus:ring-0"
+              aria-label="Dashboard transaction sorting"
+            >
+              <option value="NEWEST">Newest Date</option>
+              <option value="OLDEST">Oldest Date</option>
+              <option value="AMOUNT_HIGH">Highest Amount</option>
+              <option value="AMOUNT_LOW">Lowest Amount</option>
             </select>
           </div>
         </div>
@@ -478,7 +514,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold tracking-tight">Recent Transactions</h2>
             <Badge variant="outline" className="text-[10px]">
-              {filteredTxns.length} items
+              {sortedTxns.length} items
             </Badge>
           </div>
           <Link href="/transactions" className="text-xs text-brand-teal font-medium hover:underline">
@@ -488,12 +524,12 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-0 divide-y">
-            {filteredTxns.length === 0 ? (
+            {sortedTxns.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">
                 No transactions found for the selected time range ({timeFilter.replace("_", " ").toLowerCase()}).
               </p>
             ) : (
-              filteredTxns.slice(0, 5).map((txn: TransactionItem) => (
+              sortedTxns.slice(0, 8).map((txn: TransactionItem) => (
                 <div key={txn.id} className="p-4 flex items-center justify-between hover:bg-muted/30">
                   <div className="flex items-center gap-3">
                     <div

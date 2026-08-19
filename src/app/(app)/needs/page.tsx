@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckSquare, Plus, Check, Trash2 } from "lucide-react";
+import { CheckSquare, Plus, Check, Trash2, Loader2 } from "lucide-react";
 
 interface NeedItem {
   id: string;
@@ -14,53 +15,91 @@ interface NeedItem {
   category: "MUST_HAVE" | "HIGH_PRIORITY" | "MEDIUM" | "WANT";
   estimatedCost: number;
   isFulfilled: boolean;
-  notes?: string;
+  notes?: string | null;
 }
 
 export default function NeedsPage() {
-  const [needs, setNeeds] = useState<NeedItem[]>([
-    { id: "1", title: "Monthly Grocery Allowance", category: "MUST_HAVE", estimatedCost: 1500, isFulfilled: true, notes: "Essential food supply" },
-    { id: "2", title: "Health Insurance Premium", category: "MUST_HAVE", estimatedCost: 400, isFulfilled: true, notes: "Medical cover renewal" },
-    { id: "3", title: "Ergonomic Office Chair", category: "HIGH_PRIORITY", estimatedCost: 850, isFulfilled: false, notes: "Back posture relief" },
-    { id: "4", title: "Noise Canceling Headphones", category: "WANT", estimatedCost: 1200, isFulfilled: false, notes: "Travel & focus" },
-  ]);
-
+  const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<"MUST_HAVE" | "HIGH_PRIORITY" | "MEDIUM" | "WANT">("MUST_HAVE");
+  const [category, setCategory] = useState<NeedItem["category"]>("MUST_HAVE");
   const [estimatedCost, setEstimatedCost] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Query real needs from PostgreSQL
+  const { data: needsData, isLoading } = useQuery<{ data: NeedItem[] }>({
+    queryKey: ["needs"],
+    queryFn: async () => {
+      const res = await fetch("/api/needs");
+      if (!res.ok) throw new Error("Failed to fetch needs");
+      return res.json();
+    },
+  });
+
+  const needs = needsData?.data ?? [];
+
+  // Create Mutation
+  const createMutation = useMutation({
+    mutationFn: async (payload: { title: string; category: string; estimatedCost: number; notes?: string }) => {
+      const res = await fetch("/api/needs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to create need item");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["needs"] });
+      setIsAdding(false);
+      setTitle("");
+      setEstimatedCost("");
+      setNotes("");
+    },
+  });
+
+  // Toggle Fulfilled Mutation
+  const toggleFulfilledMutation = useMutation({
+    mutationFn: async ({ id, isFulfilled }: { id: string; isFulfilled: boolean }) => {
+      const res = await fetch(`/api/needs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFulfilled }),
+      });
+      if (!res.ok) throw new Error("Failed to update need item");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["needs"] });
+    },
+  });
+
+  // Delete Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/needs/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete need item");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["needs"] });
+    },
+  });
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !estimatedCost) return;
 
-    const newItem: NeedItem = {
-      id: Date.now().toString(),
+    createMutation.mutate({
       title,
       category,
-      estimatedCost: parseFloat(estimatedCost),
-      isFulfilled: false,
+      estimatedCost: parseFloat(estimatedCost) || 0,
       notes: notes || undefined,
-    };
-
-    setNeeds([newItem, ...needs]);
-    setIsAdding(false);
-    setTitle("");
-    setEstimatedCost("");
-    setNotes("");
+    });
   };
 
-  const toggleFulfilled = (id: string) => {
-    setNeeds(needs.map((n) => (n.id === id ? { ...n, isFulfilled: !n.isFulfilled } : n)));
-  };
-
-  const deleteItem = (id: string) => {
-    setNeeds(needs.filter((n) => n.id !== id));
-  };
-
-  const totalNeedsCost = needs.reduce((sum, n) => sum + n.estimatedCost, 0);
-  const fulfilledCost = needs.filter((n) => n.isFulfilled).reduce((sum, n) => sum + n.estimatedCost, 0);
+  const totalNeedsCost = needs.reduce((sum, n) => sum + Number(n.estimatedCost), 0);
+  const fulfilledCost = needs.filter((n) => n.isFulfilled).reduce((sum, n) => sum + Number(n.estimatedCost), 0);
 
   return (
     <div className="space-y-6">
@@ -139,7 +178,9 @@ export default function NeedsPage() {
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
-                <Button type="submit" className="bg-brand-teal text-white hover:bg-brand-teal/90">Save Item</Button>
+                <Button type="submit" className="bg-brand-teal text-white hover:bg-brand-teal/90" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "Saving..." : "Save Item"}
+                </Button>
               </div>
             </CardContent>
           </form>
@@ -153,32 +194,46 @@ export default function NeedsPage() {
           <CardDescription className="text-xs">Check off items as they are funded or fulfilled</CardDescription>
         </CardHeader>
         <CardContent className="divide-y p-0">
-          {needs.map((n) => (
-            <div key={n.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-              <div className="flex items-center gap-3">
-                <button onClick={() => toggleFulfilled(n.id)} className={`h-6 w-6 rounded border flex items-center justify-center cursor-pointer transition-colors ${n.isFulfilled ? "bg-brand-teal border-brand-teal text-white" : "border-input hover:border-brand-teal"}`}>
-                  {n.isFulfilled && <Check className="h-4 w-4" />}
-                </button>
-                <div>
-                  <h4 className={`font-bold text-base ${n.isFulfilled ? "line-through text-muted-foreground" : "text-foreground"}`}>{n.title}</h4>
-                  <p className="text-xs text-muted-foreground">{n.notes || "No notes"}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="font-extrabold text-base text-foreground">GHS {n.estimatedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
-                  <Badge variant={n.category === "MUST_HAVE" ? "destructive" : n.category === "HIGH_PRIORITY" ? "teal" : "outline"} className="text-[10px] mt-0.5">
-                    {n.category.replace("_", " ")}
-                  </Badge>
-                </div>
-
-                <Button size="icon" variant="ghost" onClick={() => deleteItem(n.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-brand-teal" /> Loading needs & wants list...
             </div>
-          ))}
+          ) : needs.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">
+              No needs or discretionary items logged yet. Click &quot;Add Need / Want&quot; above to create one.
+            </div>
+          ) : (
+            needs.map((n) => (
+              <div key={n.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleFulfilledMutation.mutate({ id: n.id, isFulfilled: !n.isFulfilled })}
+                    disabled={toggleFulfilledMutation.isPending}
+                    className={`h-6 w-6 rounded border flex items-center justify-center cursor-pointer transition-colors ${n.isFulfilled ? "bg-brand-teal border-brand-teal text-white" : "border-input hover:border-brand-teal"}`}
+                  >
+                    {n.isFulfilled && <Check className="h-4 w-4" />}
+                  </button>
+                  <div>
+                    <h4 className={`font-bold text-base ${n.isFulfilled ? "line-through text-muted-foreground" : "text-foreground"}`}>{n.title}</h4>
+                    <p className="text-xs text-muted-foreground">{n.notes || "No notes"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-extrabold text-base text-foreground">GHS {Number(n.estimatedCost).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+                    <Badge variant={n.category === "MUST_HAVE" ? "destructive" : n.category === "HIGH_PRIORITY" ? "teal" : "outline"} className="text-[10px] mt-0.5">
+                      {n.category.replace("_", " ")}
+                    </Badge>
+                  </div>
+
+                  <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(n.id)} disabled={deleteMutation.isPending} className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

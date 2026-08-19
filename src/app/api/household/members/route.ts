@@ -14,15 +14,38 @@ export async function GET() {
     }
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const members = await prisma.householdMember.findMany({
+    const rawMembers = await prisma.householdMember.findMany({
       where: { householdId: household.id },
       orderBy: { joinedAt: "asc" },
+    });
+
+    const userIds = rawMembers.map((m) => m.userId);
+    const profiles = await prisma.userProfile.findMany({
+      where: {
+        OR: [
+          { id: { in: userIds } },
+          { email: { in: userIds } },
+        ],
+      },
+    });
+
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+    const emailProfileMap = new Map(profiles.map((p) => [p.email, p]));
+
+    const membersWithNames = rawMembers.map((m) => {
+      const p = profileMap.get(m.userId) || emailProfileMap.get(m.userId);
+      return {
+        ...m,
+        userName: p?.name || (p?.username ? `@${p.username}` : null) || (p?.email ? p.email.split("@")[0] : m.userId),
+        userHandle: p?.username ? `@${p.username}` : null,
+        email: p?.email || (m.userId.includes("@") ? m.userId : user.email),
+      };
     });
 
     return NextResponse.json({
       data: {
         household,
-        members,
+        members: membersWithNames,
       },
     });
   } catch (error) {
@@ -53,11 +76,11 @@ export async function POST(request: Request) {
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
     const { email, role } = validation.data;
 
-    // Check if member with this email/userId already exists
+    // Check if member already exists
     const member = await prisma.householdMember.create({
       data: {
         householdId: household.id,
-        userId: email, // Placeholder or Supabase user id
+        userId: email,
         role,
       },
     });

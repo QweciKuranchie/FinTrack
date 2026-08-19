@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, RefreshCw, Smartphone, CheckCircle2, ShieldCheck, Zap, FileText } from "lucide-react";
+import { Landmark, RefreshCw, Smartphone, CheckCircle2, ShieldCheck, Zap, FileText, Loader2 } from "lucide-react";
 
 interface SyncFeedItem {
   id: string;
@@ -13,30 +14,52 @@ interface SyncFeedItem {
   type: "INCOME" | "EXPENSE" | "TRANSFER";
   amount: number;
   description: string;
-  account: string;
-  time: string;
+  accountName: string;
+  createdAt: string;
   status: "PARSED" | "SYNCED";
 }
 
 export default function SyncPage() {
+  const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [rawSmsInput, setRawSmsInput] = useState("");
-  const [parsedMsg, setParsedMsg] = useState<string | null>(null);
 
-  const [feed, setFeed] = useState<SyncFeedItem[]>([
-    { id: "1", source: "MTN MoMo API", type: "EXPENSE", amount: 45.0, description: "Data Bundle Purchase - MTN Ghana", account: "MTN MoMo (024****123)", time: "10 mins ago", status: "SYNCED" },
-    { id: "2", source: "Ecobank Open Banking", type: "INCOME", amount: 2500.0, description: "Salary Transfer - FinTech Corp", account: "Ecobank Checking (****4589)", time: "2 hours ago", status: "SYNCED" },
-    { id: "3", source: "Telecel Cash Gateway", type: "EXPENSE", amount: 120.0, description: "Electricity ECG Prepaid Token", account: "Telecel Cash (020****456)", time: "5 hours ago", status: "PARSED" },
-  ]);
+  // Query real sync feeds from PostgreSQL
+  const { data: syncFeedData, isLoading } = useQuery<{ data: SyncFeedItem[] }>({
+    queryKey: ["sync-feed"],
+    queryFn: async () => {
+      const res = await fetch("/api/sync");
+      if (!res.ok) throw new Error("Failed to fetch sync feed");
+      return res.json();
+    },
+  });
+
+  const feed = syncFeedData?.data ?? [];
+
+  // Create Sync Feed Mutation
+  const createSyncFeedMutation = useMutation({
+    mutationFn: async (payload: { source: string; type: string; amount: number; description: string; accountName: string; status: string }) => {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to log sync entry");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sync-feed"] });
+    },
+  });
 
   const handleSyncAll = () => {
     setIsSyncing(true);
     setSyncSuccessMsg(null);
     setTimeout(() => {
       setIsSyncing(false);
-      setSyncSuccessMsg("All connected Mobile Money and Bank accounts synced successfully! 3 new statement entries updated.");
-    }, 2000);
+      setSyncSuccessMsg("Connected Mobile Money and Bank gateways refreshed!");
+    }, 1500);
   };
 
   const handleParseSms = (e: React.FormEvent) => {
@@ -46,20 +69,17 @@ export default function SyncPage() {
     // Extract amount and description from pasted MoMo SMS
     const amountMatch = rawSmsInput.match(/(?:GHS|GH₵|₵)\s*([\d,]+(?:\.\d{2})?)/i) || rawSmsInput.match(/([\d,]+(?:\.\d{2})?)\s*(?:GHS|GH₵|₵)/i);
     const extractedAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, "")) : 100.0;
+    const isIncome = rawSmsInput.toLowerCase().includes("received") || rawSmsInput.toLowerCase().includes("credited");
 
-    const newFeedEntry: SyncFeedItem = {
-      id: Date.now().toString(),
-      source: "Manual SMS Paste Engine",
-      type: rawSmsInput.toLowerCase().includes("received") ? "INCOME" : "EXPENSE",
+    createSyncFeedMutation.mutate({
+      source: "SMS Statement Parser",
+      type: isIncome ? "INCOME" : "EXPENSE",
       amount: extractedAmount,
-      description: rawSmsInput.slice(0, 60) + "...",
-      account: "MTN MoMo / Bank Feed",
-      time: "Just now",
+      description: rawSmsInput.slice(0, 70) + "...",
+      accountName: "MTN MoMo / Bank Wallet",
       status: "PARSED",
-    };
+    });
 
-    setFeed([newFeedEntry, ...feed]);
-    setParsedMsg(`Parsed GHS ${extractedAmount.toFixed(2)} transaction from SMS statement!`);
     setRawSmsInput("");
   };
 
@@ -108,8 +128,8 @@ export default function SyncPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-xs">
             <div className="flex justify-between text-muted-foreground">
-              <span>Account:</span>
-              <span className="font-semibold text-foreground">024****123</span>
+              <span>Gateway:</span>
+              <span className="font-semibold text-foreground">Active SMS & API</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Auto Sync:</span>
@@ -131,8 +151,8 @@ export default function SyncPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-xs">
             <div className="flex justify-between text-muted-foreground">
-              <span>Account:</span>
-              <span className="font-semibold text-foreground">020****456</span>
+              <span>Gateway:</span>
+              <span className="font-semibold text-foreground">Active Feed</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Auto Sync:</span>
@@ -146,7 +166,7 @@ export default function SyncPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-teal-600" />
-                <CardTitle className="text-base font-bold">Ecobank Open API</CardTitle>
+                <CardTitle className="text-base font-bold">Bank Open API</CardTitle>
               </div>
               <Badge variant="teal" className="text-[10px]">Active</Badge>
             </div>
@@ -154,8 +174,8 @@ export default function SyncPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-xs">
             <div className="flex justify-between text-muted-foreground">
-              <span>Account:</span>
-              <span className="font-semibold text-foreground">****4589</span>
+              <span>Gateway:</span>
+              <span className="font-semibold text-foreground">Open Banking</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Auto Sync:</span>
@@ -172,7 +192,7 @@ export default function SyncPage() {
             <FileText className="h-5 w-5 text-brand-teal" /> Instant MoMo / Bank SMS Statement Parser
           </CardTitle>
           <CardDescription className="text-xs">
-            Paste any raw SMS payment alert text to automatically extract amounts, categories, and generate structured transactions
+            Paste any raw SMS payment alert text to automatically extract amounts, categories, and persist real log entries to PostgreSQL
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -189,14 +209,8 @@ export default function SyncPage() {
               />
             </div>
 
-            {parsedMsg && (
-              <p className="text-xs font-semibold text-teal-600 flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4" /> {parsedMsg}
-              </p>
-            )}
-
-            <Button type="submit" size="sm" className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer">
-              <Zap className="h-3.5 w-3.5 mr-1" /> Parse & Auto-Categorize Statement
+            <Button type="submit" size="sm" className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer" disabled={createSyncFeedMutation.isPending}>
+              <Zap className="h-3.5 w-3.5 mr-1" /> {createSyncFeedMutation.isPending ? "Parsing & Saving..." : "Parse & Save Statement"}
             </Button>
           </form>
         </CardContent>
@@ -206,29 +220,39 @@ export default function SyncPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-bold">Live Auto-Synced Statement Feed</CardTitle>
-          <CardDescription className="text-xs">Real-time log of ingested mobile money and bank transactions</CardDescription>
+          <CardDescription className="text-xs">Real-time log of ingested mobile money and bank transactions stored in database</CardDescription>
         </CardHeader>
         <CardContent className="divide-y p-0">
-          {feed.map((item) => (
-            <div key={item.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm text-foreground">{item.description}</p>
-                  <Badge variant="outline" className="text-[10px]">{item.source}</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">{item.account} • {item.time}</p>
-              </div>
-
-              <div className="text-right">
-                <p className={`font-extrabold text-base ${item.type === "INCOME" ? "text-teal-600 dark:text-teal-400" : "text-foreground"}`}>
-                  {item.type === "INCOME" ? "+" : "-"} GHS {item.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </p>
-                <span className="text-[10px] font-semibold text-teal-600 uppercase flex items-center gap-1 justify-end mt-0.5">
-                  <ShieldCheck className="h-3 w-3" /> Verified
-                </span>
-              </div>
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-brand-teal" /> Loading statement sync logs...
             </div>
-          ))}
+          ) : feed.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">
+              No auto-synced statement feeds recorded yet. Paste a raw SMS statement above to test ingestion.
+            </div>
+          ) : (
+            feed.map((item) => (
+              <div key={item.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm text-foreground">{item.description}</p>
+                    <Badge variant="outline" className="text-[10px]">{item.source}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{item.accountName} • {new Date(item.createdAt).toLocaleString()}</p>
+                </div>
+
+                <div className="text-right">
+                  <p className={`font-extrabold text-base ${item.type === "INCOME" ? "text-teal-600 dark:text-teal-400" : "text-foreground"}`}>
+                    {item.type === "INCOME" ? "+" : "-"} GHS {Number(item.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className="text-[10px] font-semibold text-teal-600 uppercase flex items-center gap-1 justify-end mt-0.5">
+                    <ShieldCheck className="h-3 w-3" /> {item.status}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

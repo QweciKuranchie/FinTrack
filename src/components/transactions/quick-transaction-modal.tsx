@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReceiptText } from "lucide-react";
 
 interface QuickTransactionModalProps {
   isOpen: boolean;
@@ -26,6 +27,12 @@ export function QuickTransactionModal({
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+
+  // Optional Tax State
+  const [hasTax, setHasTax] = useState(false);
+  const [taxRateInput, setTaxRateInput] = useState("15");
+  const [customTaxAmountInput, setCustomTaxAmountInput] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +47,19 @@ export function QuickTransactionModal({
 
   if (!isOpen) return null;
 
+  const numericAmount = parseFloat(amount) || 0;
+  const numericTaxRate = parseFloat(taxRateInput) || 0;
+  const calculatedTaxAmount = hasTax
+    ? customTaxAmountInput
+      ? parseFloat(customTaxAmountInput) || 0
+      : (numericAmount * numericTaxRate) / 100
+    : 0;
+  const totalExpenseDeduction = type === "EXPENSE" ? numericAmount + calculatedTaxAmount : numericAmount;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       setError("Please enter a valid positive amount");
       return;
@@ -57,11 +72,15 @@ export function QuickTransactionModal({
 
     const selectedAccount = accounts.find((a) => a.id === accountId);
 
-    // Validate insufficient balance
+    // Validate insufficient balance against total expense deduction (base + tax)
     if ((type === "TRANSFER" || type === "EXPENSE") && selectedAccount && selectedAccount.currentBalance !== undefined) {
-      if (numericAmount > selectedAccount.currentBalance) {
+      if (totalExpenseDeduction > selectedAccount.currentBalance) {
+        const requiredStr = type === "EXPENSE" && calculatedTaxAmount > 0
+          ? `Total Expense ${selectedAccount.currency} ${totalExpenseDeduction.toFixed(2)} (Base ${selectedAccount.currency} ${numericAmount.toFixed(2)} + Tax ${selectedAccount.currency} ${calculatedTaxAmount.toFixed(2)})`
+          : `Amount (${selectedAccount.currency} ${numericAmount.toFixed(2)})`;
+
         setError(
-          `Insufficient balance: ${type === "TRANSFER" ? "Transfer amount" : "Amount"} (${selectedAccount.currency} ${numericAmount.toFixed(2)}) exceeds available balance in ${selectedAccount.name} (${selectedAccount.currency} ${Number(selectedAccount.currentBalance).toFixed(2)})`
+          `Insufficient balance: ${requiredStr} exceeds available balance in ${selectedAccount.name} (${selectedAccount.currency} ${Number(selectedAccount.currentBalance).toFixed(2)})`
         );
         return;
       }
@@ -88,6 +107,8 @@ export function QuickTransactionModal({
           accountId,
           categoryId: categoryId || null,
           amount: numericAmount,
+          taxRate: hasTax ? numericTaxRate : 0,
+          taxAmount: hasTax ? calculatedTaxAmount : 0,
           currency: selectedAccount?.currency || "GHS",
           type,
           description: description || null,
@@ -104,6 +125,8 @@ export function QuickTransactionModal({
 
       // Reset form & trigger callbacks
       setAmount("");
+      setHasTax(false);
+      setCustomTaxAmountInput("");
       setDescription("");
       onSuccess();
       onClose();
@@ -120,7 +143,7 @@ export function QuickTransactionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl border animate-in fade-in zoom-in-95">
+      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl border animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold tracking-tight mb-1">Quick Log Transaction</h2>
         <p className="text-xs text-muted-foreground mb-4">
           Record an income, expense outcoming, or account-to-account transfer
@@ -153,7 +176,7 @@ export function QuickTransactionModal({
 
           {/* Amount */}
           <div className="space-y-1">
-            <Label htmlFor="amount">Amount</Label>
+            <Label htmlFor="amount">Base Amount</Label>
             <Input
               id="amount"
               type="number"
@@ -165,11 +188,102 @@ export function QuickTransactionModal({
             />
           </div>
 
+          {/* Optional Tax / Levy section for Expenses */}
+          {type === "EXPENSE" && (
+            <div className="rounded-xl border p-3 bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <label htmlFor="hasTax" className="text-xs font-bold flex items-center gap-1.5 cursor-pointer text-foreground">
+                  <ReceiptText className="h-4 w-4 text-brand-teal" /> Include Optional Tax / Levy
+                </label>
+                <input
+                  id="hasTax"
+                  type="checkbox"
+                  checked={hasTax}
+                  onChange={(e) => setHasTax(e.target.checked)}
+                  className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                />
+              </div>
+
+              {hasTax && (
+                <div className="space-y-3 pt-1 border-t">
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "15% VAT", rate: "15" },
+                      { label: "21.9% E-Levy/VAT", rate: "21.9" },
+                      { label: "5% NHIL", rate: "5" },
+                      { label: "Custom", rate: "0" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setTaxRateInput(preset.rate);
+                          setCustomTaxAmountInput("");
+                        }}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                          taxRateInput === preset.rate && !customTaxAmountInput
+                            ? "bg-brand-teal text-white border-brand-teal"
+                            : "bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="taxRateInput" className="text-[11px]">Tax Rate (%)</Label>
+                      <Input
+                        id="taxRateInput"
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g. 15"
+                        value={taxRateInput}
+                        onChange={(e) => {
+                          setTaxRateInput(e.target.value);
+                          setCustomTaxAmountInput("");
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="customTaxAmountInput" className="text-[11px]">Direct Tax Amount</Label>
+                      <Input
+                        id="customTaxAmountInput"
+                        type="number"
+                        step="0.01"
+                        placeholder="Optional fixed tax"
+                        value={customTaxAmountInput}
+                        onChange={(e) => setCustomTaxAmountInput(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calculated Breakdown Card */}
+                  <div className="p-2.5 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-500/20 text-xs space-y-1">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Base Expense:</span>
+                      <span className="font-semibold text-foreground">GHS {numericAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Calculated Tax ({taxRateInput}%):</span>
+                      <span className="font-semibold text-teal-600 dark:text-teal-400">+ GHS {calculatedTaxAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold border-t pt-1 text-foreground">
+                      <span>Total Account Deduction:</span>
+                      <span className="text-brand-teal">GHS {totalExpenseDeduction.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Transfer Accounts (From & To) or Single Account */}
           {type === "TRANSFER" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="account">Transfer From (Source Account)</Label>
+                <Label htmlFor="account">Transfer From (Source)</Label>
                 <select
                   id="account"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
@@ -187,7 +301,7 @@ export function QuickTransactionModal({
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="transferAccount">Transfer To (Destination Account)</Label>
+                <Label htmlFor="transferAccount">Transfer To (Destination)</Label>
                 <select
                   id="transferAccount"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"

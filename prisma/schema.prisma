@@ -25,6 +25,10 @@ model Household {
   snapshots     NetWorthSnapshot[]
   savingsGoals  SavingsGoal[]
   debtRecords   DebtRecord[]
+  repairs       RepairTask[]
+  needs         NeedItem[]
+  promises      PromisePledge[]
+  syncFeeds     SyncFeed[]
 }
 
 model HouseholdMember {
@@ -107,6 +111,8 @@ model Transaction {
   accountId         String
   categoryId        String?
   amount            Decimal
+  taxRate           Decimal?  @default(0)
+  taxAmount         Decimal?  @default(0)
   currency          String
   type              TxnType
   description       String?
@@ -303,4 +309,64 @@ model SavingsGoal {
 
   household Household @relation(fields: [householdId], references: [id])
   account   Account?  @relation(fields: [accountId], references: [id])
+}
+
+model RepairTask {
+  id            String   @id @default(uuid())
+  householdId   String
+  type          String   @default("REPAIR") // REPAIR, REPLACEMENT
+  item          String
+  category      String
+  estimatedCost Decimal  @default(0)
+  status        String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  urgency       String   @default("MEDIUM")  // HIGH, MEDIUM, LOW
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+model NeedItem {
+  id            String   @id @default(uuid())
+  householdId   String
+  title         String
+  category      String   @default("MUST_HAVE") // MUST_HAVE, HIGH_PRIORITY, MEDIUM, WANT
+  estimatedCost Decimal  @default(0)
+  isFulfilled   Boolean  @default(false)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+model PromisePledge {
+  id          String    @id @default(uuid())
+  householdId String
+  type        String    @default("PROMISED_BY_ME") // PROMISED_BY_ME, PROMISED_TO_ME
+  recipient   String
+  purpose     String
+  amount      Decimal   @default(0)
+  dueDate     DateTime?
+  status      String    @default("PENDING") // PENDING, PARTIAL, FULFILLED
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id])
+}
+
+model SyncFeed {
+  id          String   @id @default(uuid())
+  householdId String
+  source      String
+  type        String   // INCOME, EXPENSE, TRANSFER
+  amount      Decimal  @default(0)
+  description String
+  accountName String
+  status      String   @default("SYNCED") // PARSED, SYNCED
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
 }

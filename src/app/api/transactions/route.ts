@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const { accountId, categoryId, amount, currency, type, description, date, transferAccountId } =
+    const { accountId, categoryId, amount, taxRate, taxAmount, currency, type, description, date, transferAccountId } =
       validation.data;
 
     // Verify account belongs to household
@@ -101,14 +101,21 @@ export async function POST(request: Request) {
     }
 
     const decimalAmount = new Prisma.Decimal(amount);
+    const decimalTaxRate = new Prisma.Decimal(taxRate || 0);
+    const decimalTaxAmount = new Prisma.Decimal(taxAmount || 0);
+    const decimalTotalExpenseDeduction = type === "EXPENSE" ? decimalAmount.add(decimalTaxAmount) : decimalAmount;
 
     // Validate insufficient balance for transfers and expenses
     if (type === "TRANSFER" || type === "EXPENSE") {
-      if (decimalAmount.gt(account.currentBalance)) {
+      if (decimalTotalExpenseDeduction.gt(account.currentBalance)) {
+        const requiredAmountStr = type === "EXPENSE" && decimalTaxAmount.gt(0)
+          ? `${currency} ${Number(decimalTotalExpenseDeduction).toFixed(2)} (Base ${amount} + Tax ${Number(decimalTaxAmount).toFixed(2)})`
+          : `${currency} ${amount}`;
+
         return NextResponse.json(
           {
             error: {
-              message: `Insufficient balance in ${account.name}. ${type === "TRANSFER" ? "Transfer amount" : "Amount"} (${currency} ${amount}) exceeds current account balance (${account.currency} ${Number(account.currentBalance).toFixed(2)})`,
+              message: `Insufficient balance in ${account.name}. ${type === "TRANSFER" ? "Transfer amount" : "Total expense"} (${requiredAmountStr}) exceeds available balance (${account.currency} ${Number(account.currentBalance).toFixed(2)})`,
             },
           },
           { status: 400 }
@@ -123,6 +130,8 @@ export async function POST(request: Request) {
           accountId,
           categoryId: categoryId || null,
           amount: decimalAmount,
+          taxRate: decimalTaxRate,
+          taxAmount: decimalTaxAmount,
           currency,
           type,
           description,
@@ -139,7 +148,7 @@ export async function POST(request: Request) {
       if (type === "EXPENSE") {
         await tx.account.update({
           where: { id: accountId },
-          data: { currentBalance: { decrement: decimalAmount } },
+          data: { currentBalance: { decrement: decimalTotalExpenseDeduction } },
         });
       } else if (type === "INCOME") {
         await tx.account.update({

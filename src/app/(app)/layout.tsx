@@ -35,6 +35,7 @@ import {
   Bell,
   Wrench,
   CheckSquare,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -90,7 +91,7 @@ const sidebarSections: NavSection[] = [
   {
     title: "COLLABORATIVE",
     items: [
-      { name: "Shared Workspaces", href: "/settings", icon: Users },
+      { name: "Shared Workspaces", href: "/workspaces", icon: Users },
       { name: "Bill Splits", href: "/transactions", icon: Handshake },
     ],
   },
@@ -219,6 +220,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     },
   });
 
+  // Delete Workspace Mutation
+  const deleteWorkspaceMutation = useMutation({
+    mutationFn: async (workspaceId: string) => {
+      const res = await fetch(`/api/workspaces/${workspaceId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to delete workspace");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+
   // User Profile Query
   const { data: userProfileData } = useQuery<{ data: { name: string; username: string; email: string; workspaceName: string } }>({
     queryKey: ["user-profile"],
@@ -317,28 +338,48 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </button>
               ) : (
                 workspacesList.map((ws) => (
-                  <button
+                  <div
                     key={ws.id}
-                    onClick={() => {
-                      if (!ws.isCurrentActive) {
-                        switchWorkspaceMutation.mutate(ws.id);
-                      } else {
-                        setIsWorkspaceDropdownOpen(false);
-                      }
-                    }}
-                    disabled={switchWorkspaceMutation.isPending}
-                    className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
                       ws.isCurrentActive
                         ? "bg-brand-teal/10 font-bold text-brand-teal"
                         : "hover:bg-muted text-foreground"
                     }`}
                   >
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <User className="h-3.5 w-3.5 shrink-0 text-brand-teal" />
-                      <span className="truncate">{ws.name}</span>
-                    </div>
-                    {ws.isCurrentActive && <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0" />}
-                  </button>
+                    <button
+                      onClick={() => {
+                        if (!ws.isCurrentActive) {
+                          switchWorkspaceMutation.mutate(ws.id);
+                        } else {
+                          setIsWorkspaceDropdownOpen(false);
+                        }
+                      }}
+                      disabled={switchWorkspaceMutation.isPending}
+                      className="flex-1 flex items-center justify-between text-left cursor-pointer mr-2 truncate"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <User className="h-3.5 w-3.5 shrink-0 text-brand-teal" />
+                        <span className="truncate">{ws.name}</span>
+                      </div>
+                      {ws.isCurrentActive && <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0 ml-1" />}
+                    </button>
+
+                    {workspacesList.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Are you sure you want to delete workspace "${ws.name}"?`)) {
+                            deleteWorkspaceMutation.mutate(ws.id);
+                          }
+                        }}
+                        disabled={deleteWorkspaceMutation.isPending}
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer shrink-0 transition-colors"
+                        title={`Delete ${ws.name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 ))
               )}
             </div>
