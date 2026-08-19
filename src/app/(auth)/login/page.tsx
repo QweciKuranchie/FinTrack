@@ -121,7 +121,7 @@ export default function LoginPage() {
               </label>
 
               <Link href="/signup" className="text-xs text-brand-teal hover:underline font-semibold">
-                Need an account?
+                Forgot password?
               </Link>
             </div>
           </CardContent>
