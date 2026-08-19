@@ -20,8 +20,6 @@ import {
   Tag,
   Mail,
   FileText,
-  RefreshCw,
-  Globe,
   ShieldCheck,
   CheckCircle2,
   Camera,
@@ -43,19 +41,11 @@ interface HouseholdMember {
   joinedAt: string;
 }
 
-interface FxRateItem {
-  id: string;
-  baseCurrency: string;
-  targetCurrency: string;
-  rate: number;
-  fetchedAt: string;
-}
-
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<"profile" | "categories" | "household" | "fx" | "export">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "categories" | "household" | "export">("profile");
 
   // Profile Form State
   const [baseCurrency, setBaseCurrency] = useState("GHS");
@@ -89,15 +79,6 @@ export default function SettingsPage() {
     queryFn: async () => {
       const res = await fetch("/api/household/members");
       if (!res.ok) throw new Error("Failed to fetch household members");
-      return res.json();
-    },
-  });
-
-  const { data: fxRatesData, refetch: refetchFxRates } = useQuery<{ data: FxRateItem[] }>({
-    queryKey: ["fx-rates"],
-    queryFn: async () => {
-      const res = await fetch("/api/fx/rates");
-      if (!res.ok) throw new Error("Failed to fetch FX rates");
       return res.json();
     },
   });
@@ -161,19 +142,6 @@ export default function SettingsPage() {
     onError: (err: Error) => setError(err.message),
   });
 
-  const refreshFxMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/cron/fx-refresh");
-      if (!res.ok) throw new Error("Failed to refresh FX rates");
-      return res.json();
-    },
-    onSuccess: () => {
-      refetchFxRates();
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      setProfileSuccessMsg("FX Rates refreshed successfully from open.er-api.com!");
-    },
-  });
-
   const triggerSnapshotMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/cron/net-worth-snapshot");
@@ -205,7 +173,6 @@ export default function SettingsPage() {
 
   const categories = categoriesData?.data ?? [];
   const householdInfo = householdData?.data;
-  const fxRates = fxRatesData?.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -566,52 +533,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* 4. FX & Exchange Rates Settings */}
-      {activeTab === "fx" && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div>
-                <CardTitle className="text-base">Cached Exchange Rates</CardTitle>
-                <CardDescription className="text-xs">
-                  Exchange rates fetched from open.er-api.com and cached for multi-currency conversion
-                </CardDescription>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => refreshFxMutation.mutate()}
-                disabled={refreshFxMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${refreshFxMutation.isPending ? "animate-spin" : ""}`} /> Refresh Rates
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0 divide-y">
-              {fxRates.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  No cached FX rates found. Click &quot;Refresh Rates&quot; to fetch latest exchange rates.
-                </div>
-              ) : (
-                fxRates.map((rate) => (
-                  <div key={rate.id} className="p-3 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-brand-teal" />
-                      <span className="font-semibold">
-                        1 {rate.baseCurrency} = {rate.rate} {rate.targetCurrency}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground">
-                      Updated {new Date(rate.fetchedAt).toLocaleString()}
-                    </span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* 5. Data Export & Backups Settings */}
+      {/* 4. Data Export & Backups Settings */}
       {activeTab === "export" && (
         <div className="space-y-4">
           <Card>
