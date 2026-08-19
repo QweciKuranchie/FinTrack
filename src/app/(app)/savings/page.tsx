@@ -48,6 +48,18 @@ export default function SavingsPage() {
   const [currentAmount, setCurrentAmount] = useState("");
   const [deadline, setDeadline] = useState("");
   const [currency, setCurrency] = useState("GHS");
+  const [accountId, setAccountId] = useState("");
+
+  const { data: accountsData } = useQuery<{ data: Array<{ id: string; name: string }> }>({
+    queryKey: ["accounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounts");
+      if (!res.ok) throw new Error("Failed to fetch accounts");
+      return res.json();
+    },
+  });
+
+  const accounts = accountsData?.data ?? [];
 
   // Fetch real-time savings goals from Postgres with pagination
   const { data: goalsResponse, isLoading, isError } = useQuery<{
@@ -78,6 +90,7 @@ export default function SavingsPage() {
       currentAmount: number;
       deadline?: string | null;
       currency: string;
+      accountId?: string | null;
     }) => {
       const res = await fetch("/api/goals", {
         method: "POST",
@@ -94,6 +107,7 @@ export default function SavingsPage() {
       setTargetAmount("");
       setCurrentAmount("");
       setDeadline("");
+      setAccountId("");
     },
   });
 
@@ -137,6 +151,7 @@ export default function SavingsPage() {
       currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
       deadline: deadline || null,
       currency,
+      accountId: accountId || null,
     });
   };
 
@@ -369,6 +384,23 @@ export default function SavingsPage() {
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="accountId">Target Bank / MoMo Account to Save Into (Optional)</Label>
+                <select
+                  id="accountId"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Select Account (Optional)</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

@@ -68,15 +68,19 @@ export async function POST(request: Request) {
     }
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const { name, type, currentValue, currency } = validation.data;
+    const { name, symbol, type, quantity, purchasePrice, currentValue, currency, notes } = validation.data;
 
     const asset = await prisma.asset.create({
       data: {
         householdId: household.id,
         name,
+        symbol: symbol || null,
         type,
+        quantity: quantity ? new Prisma.Decimal(quantity) : null,
+        purchasePrice: purchasePrice ? new Prisma.Decimal(purchasePrice) : null,
         currentValue: new Prisma.Decimal(currentValue),
-        currency,
+        currency: currency || "GHS",
+        notes: notes || null,
         lastValuedAt: new Date(),
       },
     });

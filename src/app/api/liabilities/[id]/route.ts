@@ -73,7 +73,7 @@ export async function PATCH(
         type: json.type ?? existingLiability.type,
         principal: json.principal !== undefined ? new Prisma.Decimal(json.principal) : existingLiability.principal,
         currentBalance: json.currentBalance !== undefined ? new Prisma.Decimal(json.currentBalance) : existingLiability.currentBalance,
-        dueDate: json.dueDate !== undefined ? (json.dueDate ? parseInt(json.dueDate, 10) : null) : existingLiability.dueDate,
+        dueDate: json.dueDate !== undefined ? (json.dueDate ? new Date(json.dueDate) : null) : existingLiability.dueDate,
         currency: json.currency ?? existingLiability.currency,
         notes: json.notes !== undefined ? json.notes : existingLiability.notes,
       },

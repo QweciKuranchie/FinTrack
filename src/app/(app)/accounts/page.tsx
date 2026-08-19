@@ -31,7 +31,7 @@ export default function AccountsPage() {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState("CHECKING");
+  const [type, setType] = useState("BANK");
   const [currency, setCurrency] = useState("GHS");
   const [openingBalance, setOpeningBalance] = useState("0");
   const [institution, setInstitution] = useState("");
@@ -149,11 +149,11 @@ export default function AccountsPage() {
                     value={type}
                     onChange={(e) => setType(e.target.value)}
                   >
-                    <option value="CHECKING">Checking Account</option>
+                    <option value="BANK">Bank Account</option>
                     <option value="SAVINGS">Savings Account</option>
-                    <option value="MOBILE_MONEY">Mobile Money (MoMo)</option>
+                    <option value="MOBILE_MONEY">MTN Mobile Money (MoMo)</option>
+                    <option value="TELECEL_CASH">Telecel Cash</option>
                     <option value="CASH">Cash</option>
-                    <option value="INVESTMENT">Investment</option>
                     <option value="OTHER">Other</option>
                   </select>
                 </div>

@@ -2,9 +2,13 @@ import { z } from "zod";
 
 export const assetSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
+  symbol: z.string().optional().nullable(),
   type: z.enum(["PROPERTY", "VEHICLE", "INVESTMENT", "OTHER"]),
-  currentValue: z.number().nonnegative("Current value must be >= 0"),
+  quantity: z.number().optional().nullable(),
+  purchasePrice: z.number().optional().nullable(),
+  currentValue: z.number().nonnegative("Current market value must be >= 0"),
   currency: z.string().default("GHS"),
+  notes: z.string().optional().nullable(),
 });
 
 export const liabilitySchema = z.object({

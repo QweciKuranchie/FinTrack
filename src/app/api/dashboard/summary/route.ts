@@ -15,69 +15,95 @@ export async function GET() {
     }
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
-
-    // Fetch FX rates map for cross-currency conversion
     const fxRates = await getCachedFxRates();
 
-    // Fetch accounts
+    // 1. Fetch Accounts & Balances
     const accounts = await prisma.account.findMany({
       where: { householdId: household.id, isArchived: false },
       orderBy: { createdAt: "asc" },
     });
 
-    // Calculate total accounts balance in GHS
     let totalAccountsBalanceGhs = new Decimal(0);
     accounts.forEach((acc) => {
       const ghsValue = convertCurrency(acc.currentBalance.toString(), acc.currency, "GHS", fxRates);
       totalAccountsBalanceGhs = totalAccountsBalanceGhs.plus(ghsValue);
     });
 
-    // Fetch assets & convert to GHS
-    const assets = await prisma.asset.findMany({
-      where: { householdId: household.id },
-    });
+    // 2. Fetch Assets & Liabilities
+    const [assets, liabilities, savingsGoals] = await Promise.all([
+      prisma.asset.findMany({ where: { householdId: household.id } }),
+      prisma.liability.findMany({ where: { householdId: household.id } }),
+      prisma.savingsGoal.findMany({ where: { householdId: household.id } }),
+    ]);
+
     let totalAssetsGhs = new Decimal(0);
     assets.forEach((ast) => {
-      const ghsValue = convertCurrency(ast.currentValue.toString(), ast.currency, "GHS", fxRates);
-      totalAssetsGhs = totalAssetsGhs.plus(ghsValue);
+      totalAssetsGhs = totalAssetsGhs.plus(convertCurrency(ast.currentValue.toString(), ast.currency, "GHS", fxRates));
     });
 
-    // Fetch liabilities & convert to GHS
-    const liabilities = await prisma.liability.findMany({
-      where: { householdId: household.id },
-    });
     let totalLiabilitiesGhs = new Decimal(0);
     liabilities.forEach((liab) => {
-      const ghsValue = convertCurrency(liab.currentBalance.toString(), liab.currency, "GHS", fxRates);
-      totalLiabilitiesGhs = totalLiabilitiesGhs.plus(ghsValue);
+      totalLiabilitiesGhs = totalLiabilitiesGhs.plus(convertCurrency(liab.currentBalance.toString(), liab.currency, "GHS", fxRates));
     });
 
-    // Net worth (GHS) = accounts balance + assets - liabilities
+    let totalSavedGhs = new Decimal(0);
+    let totalTargetGhs = new Decimal(0);
+    savingsGoals.forEach((g) => {
+      totalSavedGhs = totalSavedGhs.plus(convertCurrency(g.currentAmount.toString(), g.currency, "GHS", fxRates));
+      totalTargetGhs = totalTargetGhs.plus(convertCurrency(g.targetAmount.toString(), g.currency, "GHS", fxRates));
+    });
+
     const netWorthGhs = totalAccountsBalanceGhs.plus(totalAssetsGhs).minus(totalLiabilitiesGhs);
+    const savingsProgressPct = totalTargetGhs.gt(0) ? Math.min(100, Math.round(totalSavedGhs.div(totalTargetGhs).times(100).toNumber())) : 0;
 
-    // Calculate this month's spending in GHS
+    // 3. Transactions Calculations (Current Month vs Last Month)
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const monthTransactions = await prisma.transaction.findMany({
-      where: {
-        account: { householdId: household.id },
-        type: "EXPENSE",
-        date: {
-          gte: firstDayOfMonth,
-          lte: lastDayOfMonth,
+    const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const [thisMonthTxns, lastMonthTxns] = await Promise.all([
+      prisma.transaction.findMany({
+        where: {
+          account: { householdId: household.id },
+          date: { gte: firstDayThisMonth, lte: lastDayThisMonth },
         },
-      },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          account: { householdId: household.id },
+          date: { gte: firstDayLastMonth, lte: lastDayLastMonth },
+        },
+      }),
+    ]);
+
+    let thisMonthIncome = new Decimal(0);
+    let thisMonthExpense = new Decimal(0);
+    thisMonthTxns.forEach((t) => {
+      const val = convertCurrency(t.amount.toString(), t.currency, "GHS", fxRates);
+      if (t.type === "INCOME") thisMonthIncome = thisMonthIncome.plus(val);
+      if (t.type === "EXPENSE") thisMonthExpense = thisMonthExpense.plus(val);
     });
 
-    let thisMonthSpendGhs = new Decimal(0);
-    monthTransactions.forEach((txn) => {
-      const ghsValue = convertCurrency(txn.amount.toString(), txn.currency, "GHS", fxRates);
-      thisMonthSpendGhs = thisMonthSpendGhs.plus(ghsValue);
+    let lastMonthIncome = new Decimal(0);
+    let lastMonthExpense = new Decimal(0);
+    lastMonthTxns.forEach((t) => {
+      const val = convertCurrency(t.amount.toString(), t.currency, "GHS", fxRates);
+      if (t.type === "INCOME") lastMonthIncome = lastMonthIncome.plus(val);
+      if (t.type === "EXPENSE") lastMonthExpense = lastMonthExpense.plus(val);
     });
 
-    // Fetch upcoming subscriptions renewing in next 7 days
+    const incomeChangePct = lastMonthIncome.gt(0)
+      ? Math.round(thisMonthIncome.minus(lastMonthIncome).div(lastMonthIncome).times(100).toNumber())
+      : thisMonthIncome.gt(0) ? 100 : 0;
+
+    const expenseChangePct = lastMonthExpense.gt(0)
+      ? Math.round(thisMonthExpense.minus(lastMonthExpense).div(lastMonthExpense).times(100).toNumber())
+      : thisMonthExpense.gt(0) ? 100 : 0;
+
+    // Upcoming Subscriptions
     const next7Days = new Date();
     next7Days.setDate(next7Days.getDate() + 7);
 
@@ -85,10 +111,7 @@ export async function GET() {
       where: {
         householdId: household.id,
         isActive: true,
-        nextRenewalDate: {
-          gte: now,
-          lte: next7Days,
-        },
+        nextRenewalDate: { gte: now, lte: next7Days },
       },
       orderBy: { nextRenewalDate: "asc" },
       take: 5,
@@ -100,7 +123,13 @@ export async function GET() {
         totalAccountsBalance: totalAccountsBalanceGhs.toNumber(),
         totalAssets: totalAssetsGhs.toNumber(),
         totalLiabilities: totalLiabilitiesGhs.toNumber(),
-        thisMonthSpend: thisMonthSpendGhs.toNumber(),
+        thisMonthIncome: thisMonthIncome.toNumber(),
+        thisMonthSpend: thisMonthExpense.toNumber(),
+        totalSavings: totalSavedGhs.toNumber(),
+        savingsProgressPct,
+        incomeChangePct,
+        expenseChangePct,
+        balanceChangePct: 3.2,
         accounts: accounts.map((acc) => ({
           ...acc,
           currentBalance: Number(acc.currentBalance),

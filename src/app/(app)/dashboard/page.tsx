@@ -35,6 +35,11 @@ interface DashboardData {
   totalAssets: number;
   totalLiabilities: number;
   thisMonthSpend: number;
+  thisMonthIncome?: number;
+  totalSavings?: number;
+  savingsProgressPct?: number;
+  incomeChangePct?: number;
+  expenseChangePct?: number;
   accounts: Account[];
 }
 
@@ -346,16 +351,19 @@ export default function DashboardPage() {
                 SAVINGS TRACKER
               </p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
-                GHS {(summary?.totalAssets ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                GHS {(summary?.totalSavings ?? summary?.totalAssets ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </h3>
               <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                ↑ +5.8%
+                {summary?.savingsProgressPct ?? 0}% Achieved Target
               </span>
             </div>
             {/* Vertical Pill Bar Progress Graphic */}
             <div className="w-12 h-14 flex items-end justify-center">
               <div className="w-3.5 h-12 bg-muted/60 rounded-full overflow-hidden flex items-end p-0.5">
-                <div className="w-full h-3/4 bg-teal-500 rounded-full" />
+                <div
+                  className="w-full bg-teal-500 rounded-full transition-all duration-300"
+                  style={{ height: `${Math.max(10, summary?.savingsProgressPct ?? 50)}%` }}
+                />
               </div>
             </div>
           </div>
@@ -369,10 +377,10 @@ export default function DashboardPage() {
                 INCOME
               </p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
-                GHS {filteredIncome.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                GHS {(summary?.thisMonthIncome ?? filteredIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </h3>
-              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                ↑ +12.0%
+              <span className={`inline-flex items-center text-xs font-semibold mt-1 ${(summary?.incomeChangePct ?? 0) >= 0 ? "text-teal-600 dark:text-teal-400" : "text-destructive"}`}>
+                {(summary?.incomeChangePct ?? 0) >= 0 ? "↑ +" : "↓ "}{summary?.incomeChangePct ?? 0}% vs Last Month
               </span>
             </div>
             {/* Green Smooth Mini Sparkline Curve */}

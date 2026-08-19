@@ -52,6 +52,7 @@ export default function LiabilitiesPage() {
   const [type, setType] = useState<"LOAN" | "CREDIT_CARD" | "MORTGAGE" | "OTHER">("LOAN");
   const [principal, setPrincipal] = useState("");
   const [interestRate, setInterestRate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [currency, setCurrency] = useState("GHS");
 
   // Fetch liabilities from database with pagination
@@ -130,6 +131,7 @@ export default function LiabilitiesPage() {
       principal: parseFloat(principal),
       currentBalance: parseFloat(principal),
       interestRate: interestRate ? parseFloat(interestRate) : null,
+      dueDate: dueDate || null,
       currency,
     });
   };
@@ -405,6 +407,16 @@ export default function LiabilitiesPage() {
                     onChange={(e) => setInterestRate(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="dueDate">Due Date (Optional)</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

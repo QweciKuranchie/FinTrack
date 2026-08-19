@@ -502,13 +502,10 @@ export default function DebtTrackerPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="formDueDate">Day of Month Due (1-31)</Label>
+                  <Label htmlFor="formDueDate">Due Date (Optional)</Label>
                   <Input
                     id="formDueDate"
-                    type="number"
-                    min="1"
-                    max="31"
-                    placeholder="15"
+                    type="date"
                     value={formDueDate}
                     onChange={(e) => setFormDueDate(e.target.value)}
                   />

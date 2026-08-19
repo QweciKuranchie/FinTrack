@@ -14,7 +14,6 @@ import {
   Moon,
   Laptop,
   Download,
-  Users,
   Plus,
   Trash2,
   Tag,
@@ -23,6 +22,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   Camera,
+  Settings2,
+  Database,
 } from "lucide-react";
 
 interface Category {
@@ -45,7 +46,8 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<"profile" | "categories" | "household" | "export">("profile");
+  // Tabs: Profile, Custom Category, App Preference, Account and Data
+  const [activeTab, setActiveTab] = useState<"profile" | "categories" | "preferences" | "account_data">("profile");
 
   // Profile Form State
   const [baseCurrency, setBaseCurrency] = useState("GHS");
@@ -56,7 +58,7 @@ export default function SettingsPage() {
   const [catType, setCatType] = useState<"INCOME" | "EXPENSE">("EXPENSE");
   const [catColor, setCatColor] = useState("#0F766E");
 
-  // Household Member State
+  // Workspace Member State
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"OWNER" | "MEMBER">("MEMBER");
 
@@ -78,10 +80,14 @@ export default function SettingsPage() {
     queryKey: ["household-members"],
     queryFn: async () => {
       const res = await fetch("/api/household/members");
-      if (!res.ok) throw new Error("Failed to fetch household members");
+      if (!res.ok) throw new Error("Failed to fetch workspace info");
       return res.json();
     },
   });
+
+  const categories = categoriesData?.data ?? [];
+  const householdInfo = householdData?.data;
+  const members = householdInfo?.members ?? [];
 
   // Mutations
   const createCategoryMutation = useMutation({
@@ -98,7 +104,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       setCatName("");
-      setError(null);
+      setProfileSuccessMsg("Custom category created successfully!");
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -106,27 +112,28 @@ export default function SettingsPage() {
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete custom category");
+      if (!res.ok) throw new Error("Failed to delete category");
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["categories"] }),
+    onError: (err: Error) => setError(err.message),
   });
 
   const inviteMemberMutation = useMutation({
-    mutationFn: async (payload: { email: string; role: string }) => {
+    mutationFn: async (payload: { email: string; role: "OWNER" | "MEMBER" }) => {
       const res = await fetch("/api/household/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to invite member");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to invite workspace member");
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household-members"] });
       setInviteEmail("");
-      setError(null);
+      setProfileSuccessMsg("Workspace invitation sent successfully!");
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -171,35 +178,37 @@ export default function SettingsPage() {
     });
   };
 
-  const categories = categoriesData?.data ?? [];
-  const householdInfo = householdData?.data;
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Settings & Administration</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage system preferences, theme mode, custom categories, household sharing, and data backups
-        </p>
+      {/* Header Bar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
+            <Settings2 className="h-7 w-7 text-brand-teal" /> Settings & Preferences
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage profile settings, custom categories, theme preferences, workspaces, and data backups
+          </p>
+        </div>
       </div>
 
       {profileSuccessMsg && (
-        <div className="rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 p-3 text-xs text-teal-800 dark:text-teal-200 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-teal-600" />
-            {profileSuccessMsg}
-          </span>
-          <button onClick={() => setProfileSuccessMsg(null)} className="text-muted-foreground hover:text-foreground">
+        <div className="p-3 bg-teal-500/10 border border-teal-500/30 text-teal-600 dark:text-teal-400 text-xs rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{profileSuccessMsg}</span>
+          </div>
+          <button onClick={() => setProfileSuccessMsg(null)} className="font-bold hover:underline">
             ×
           </button>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg bg-destructive/15 border border-destructive/30 p-3 text-xs text-destructive flex items-center justify-between">
+        <div className="p-3 bg-destructive/10 border border-destructive/30 text-destructive text-xs rounded-xl flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-destructive hover:underline">
-            Dismiss
+          <button onClick={() => setError(null)} className="text-destructive hover:underline font-bold">
+            ×
           </button>
         </div>
       )}
@@ -208,45 +217,48 @@ export default function SettingsPage() {
       <div className="flex flex-wrap gap-2 border-b pb-2">
         <button
           onClick={() => setActiveTab("profile")}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
             activeTab === "profile" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <User className="h-4 w-4" /> Profile & Theme
+          <User className="h-4 w-4" /> Profile
         </button>
+
         <button
           onClick={() => setActiveTab("categories")}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
             activeTab === "categories" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <Tag className="h-4 w-4" /> Custom Categories ({categories.length})
+          <Tag className="h-4 w-4" /> Custom Category ({categories.length})
         </button>
+
         <button
-          onClick={() => setActiveTab("household")}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-            activeTab === "household" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+          onClick={() => setActiveTab("preferences")}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "preferences" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <Users className="h-4 w-4" /> Household & Sharing
+          <Sun className="h-4 w-4" /> App Preference
         </button>
+
         <button
-          onClick={() => setActiveTab("export")}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-            activeTab === "export" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+          onClick={() => setActiveTab("account_data")}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "account_data" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <Download className="h-4 w-4" /> Data Export & Backups
+          <Database className="h-4 w-4" /> Account and Data
         </button>
       </div>
 
-      {/* 1. Profile & Theme Settings */}
+      {/* TAB 1: Profile Settings */}
       {activeTab === "profile" && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">User Profile</CardTitle>
-              <CardDescription>Authenticated user account and active household ownership</CardDescription>
+              <CardTitle className="text-base font-bold">User Profile Information</CardTitle>
+              <CardDescription className="text-xs">Your personal account details and primary currency preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4 border-b pb-4">
@@ -254,28 +266,28 @@ export default function SettingsPage() {
                   {householdInfo?.household?.name?.[0] || "U"}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-base">{householdInfo?.household?.name || "Household Owner"}</h3>
-                  <p className="text-xs text-muted-foreground">Household ID: {householdInfo?.household?.id}</p>
+                  <h3 className="font-semibold text-base">{householdInfo?.household?.name || "User Account"}</h3>
+                  <p className="text-xs text-muted-foreground">Active Workspace: {householdInfo?.household?.name || "Personal Workspace"}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="pref-currency">Primary Display Currency</Label>
+                  <Label htmlFor="pref-currency">Primary Base Currency</Label>
                   <select
                     id="pref-currency"
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                     value={baseCurrency}
                     onChange={(e) => setBaseCurrency(e.target.value)}
                   >
-                    <option value="GHS">GHS — Ghana Cedi (Base)</option>
-                    <option value="USD">USD — US Dollar</option>
-                    <option value="EUR">EUR — Euro</option>
-                    <option value="GBP">GBP — British Pound</option>
+                    <option value="GHS">GHS — Ghana Cedi (₵)</option>
+                    <option value="USD">USD — US Dollar ($)</option>
+                    <option value="EUR">EUR — Euro (€)</option>
+                    <option value="GBP">GBP — British Pound (£)</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Household Created At</Label>
+                  <Label>Workspace Created At</Label>
                   <Input
                     readOnly
                     value={
@@ -289,281 +301,265 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Theme Selector */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Appearance & Theme</CardTitle>
-              <CardDescription>Choose interface mode for light mode or night mode</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3 max-w-md">
-                <button
-                  onClick={() => setTheme("light")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all ${
-                    theme === "light"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
-                      : "border-input hover:bg-muted"
-                  }`}
-                >
-                  <Sun className="h-5 w-5" /> Light
-                </button>
-                <button
-                  onClick={() => setTheme("dark")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all ${
-                    theme === "dark"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
-                      : "border-input hover:bg-muted"
-                  }`}
-                >
-                  <Moon className="h-5 w-5" /> Dark
-                </button>
-                <button
-                  onClick={() => setTheme("system")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all ${
-                    theme === "system"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
-                      : "border-input hover:bg-muted"
-                  }`}
-                >
-                  <Laptop className="h-5 w-5" /> System
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Health Status */}
-          <Card className="border-teal-900/10">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-brand-teal" /> Database Security & System Health
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs">
-              <div className="flex items-center justify-between p-2 rounded bg-muted/40">
-                <span>Row Level Security (RLS)</span>
-                <Badge variant="teal">Enabled (Postgres)</Badge>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-muted/40">
-                <span>Prisma Client Singleton</span>
-                <Badge variant="teal">v5.22.0 Active</Badge>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-muted/40">
-                <span>Supabase Session Middleware</span>
-                <Badge variant="teal">Active</Badge>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
-      {/* 2. Custom Categories Settings */}
+      {/* TAB 2: Custom Category Settings */}
       {activeTab === "categories" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Create Custom Category</CardTitle>
-              <CardDescription>Add custom expense or income tags for budget tracking</CardDescription>
+              <CardTitle className="text-base font-bold">Add New Custom Category</CardTitle>
+              <CardDescription className="text-xs">Create custom spending or income tags for transaction logging</CardDescription>
             </CardHeader>
-            <form onSubmit={handleAddCategory}>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <CardContent>
+              <form onSubmit={handleAddCategory} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="cat-name">Category Name</Label>
                     <Input
                       id="cat-name"
-                      placeholder="e.g. Side Hustle, Crypto, Software"
+                      placeholder="e.g. Freelancing, Software"
                       value={catName}
                       onChange={(e) => setCatName(e.target.value)}
                       required
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="cat-type">Type</Label>
+                    <Label htmlFor="cat-type">Category Type</Label>
                     <select
                       id="cat-type"
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                       value={catType}
                       onChange={(e) => setCatType(e.target.value as "INCOME" | "EXPENSE")}
                     >
-                      <option value="EXPENSE">Expense</option>
-                      <option value="INCOME">Income</option>
+                      <option value="EXPENSE">Expense Category</option>
+                      <option value="INCOME">Income Category</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="cat-color">Badge Color</Label>
-                    <Input
-                      id="cat-color"
-                      type="color"
-                      className="h-9 w-full p-1 cursor-pointer"
-                      value={catColor}
-                      onChange={(e) => setCatColor(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <Button type="submit" size="sm" className="bg-brand-teal text-white">
-                    <Plus className="h-4 w-4 mr-1" /> Save Category
-                  </Button>
-                </div>
-              </CardContent>
-            </form>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">All Categories ({categories.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 divide-y">
-              {categories.map((c) => (
-                <div key={c.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-4 w-4 rounded-full"
-                      style={{ backgroundColor: c.color || "#0F766E" }}
-                    />
-                    <span className="font-semibold text-sm">{c.name}</span>
-                    <Badge variant={c.type === "INCOME" ? "teal" : "outline"} className="text-[10px]">
-                      {c.type}
-                    </Badge>
-                    {c.householdId === null && (
-                      <span className="text-[10px] text-muted-foreground italic">(Default System Category)</span>
-                    )}
-                  </div>
-
-                  {c.householdId !== null && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteCategoryMutation.mutate(c.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* 3. Household Sharing Settings */}
-      {activeTab === "household" && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Household: {householdInfo?.household?.name || "My Household"}</CardTitle>
-              <CardDescription>
-                Invite family members or partner to share access to accounts, budgets, and net worth
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleInviteMember}>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="invite-email">Member Email Address</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      placeholder="partner@example.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="invite-role">Access Role</Label>
-                    <select
-                      id="invite-role"
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      value={inviteRole}
-                      onChange={(e) => setInviteRole(e.target.value as "OWNER" | "MEMBER")}
-                    >
-                      <option value="MEMBER">Member (Shared Read/Write)</option>
-                      <option value="OWNER">Co-Owner (Full Admin)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <Button type="submit" size="sm" className="bg-brand-teal text-white">
-                    <Mail className="h-4 w-4 mr-1" /> Send Invitation
-                  </Button>
-                </div>
-              </CardContent>
-            </form>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Household Members ({householdInfo?.members?.length || 0})</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 divide-y">
-              {householdInfo?.members?.map((m) => (
-                <div key={m.id} className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Users className="h-4 w-4 text-brand-teal" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">{m.userId}</span>
-                        <Badge variant={m.role === "OWNER" ? "teal" : "outline"} className="text-[10px]">
-                          {m.role}
-                        </Badge>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">Joined {new Date(m.joinedAt).toLocaleDateString()}</span>
+                    <Label htmlFor="cat-color">Badge Color Accent</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cat-color"
+                        type="color"
+                        value={catColor}
+                        onChange={(e) => setCatColor(e.target.value)}
+                        className="h-9 w-14 p-1 cursor-pointer"
+                      />
+                      <Input value={catColor} onChange={(e) => setCatColor(e.target.value)} className="h-9 font-mono text-xs" />
                     </div>
                   </div>
-
-                  {m.role !== "OWNER" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeMemberMutation.mutate(m.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
                 </div>
-              ))}
+
+                <Button type="submit" size="sm" className="bg-brand-teal text-white hover:bg-brand-teal/90">
+                  <Plus className="h-4 w-4 mr-1" /> Create Category
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold">Category Registry</CardTitle>
+              <CardDescription className="text-xs">System defaults and custom workspace categories</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 divide-y">
+              {categories.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">No categories found.</div>
+              ) : (
+                categories.map((cat) => (
+                  <div key={cat.id} className="p-3 flex items-center justify-between text-xs hover:bg-muted/40">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color || "#0F766E" }} />
+                      <span className="font-semibold">{cat.name}</span>
+                      <Badge variant={cat.type === "INCOME" ? "teal" : "secondary"} className="text-[10px]">
+                        {cat.type}
+                      </Badge>
+                      {!cat.householdId && <span className="text-[10px] text-muted-foreground">(System Default)</span>}
+                    </div>
+
+                    {cat.householdId && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                        disabled={deleteCategoryMutation.isPending}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* 4. Data Export & Backups Settings */}
-      {activeTab === "export" && (
-        <div className="space-y-4">
+      {/* TAB 3: App Preference */}
+      {activeTab === "preferences" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Data Export & Reporting</CardTitle>
-              <CardDescription>Export transaction history or download monthly financial statements</CardDescription>
+              <CardTitle className="text-base font-bold">Appearance & Theme Preference</CardTitle>
+              <CardDescription className="text-xs">Select your preferred color theme mode across all devices</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <a href="/api/export/csv" download>
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    <Download className="h-4 w-4 mr-2" /> Export Transactions (CSV)
+              <div className="grid grid-cols-3 gap-3 max-w-md">
+                <button
+                  onClick={() => setTheme("light")}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    theme === "light"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      : "border-input hover:bg-muted"
+                  }`}
+                >
+                  <Sun className="h-5 w-5" /> Light Mode
+                </button>
+
+                <button
+                  onClick={() => setTheme("dark")}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    theme === "dark"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      : "border-input hover:bg-muted"
+                  }`}
+                >
+                  <Moon className="h-5 w-5" /> Dark Mode
+                </button>
+
+                <button
+                  onClick={() => setTheme("system")}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    theme === "system"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      : "border-input hover:bg-muted"
+                  }`}
+                >
+                  <Laptop className="h-5 w-5" /> System Default
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 4: Account and Data */}
+      {activeTab === "account_data" && (
+        <div className="space-y-6">
+          {/* Workspaces & Team Sharing */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="text-base font-bold">Workspace & Team Sharing</CardTitle>
+                <CardDescription className="text-xs">
+                  Manage multiple financial workspaces (Personal, Family, Business) and collaborators
+                </CardDescription>
+              </div>
+              <Badge variant="teal" className="text-xs">
+                Active: {householdInfo?.household?.name || "Personal Workspace"}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={handleInviteMember} className="space-y-3 border-b pb-4">
+                <Label htmlFor="invite-email">Invite Collaborator to Active Workspace</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="colleague@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    className="flex-1"
+                  />
+                  <select
+                    className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as "OWNER" | "MEMBER")}
+                  >
+                    <option value="MEMBER">Member (View & Add)</option>
+                    <option value="OWNER">Owner (Full Admin)</option>
+                  </select>
+                  <Button type="submit" size="sm" className="bg-brand-teal text-white hover:bg-brand-teal/90">
+                    <Mail className="h-4 w-4 mr-1" /> Send Invite
                   </Button>
-                </a>
-                <a href="/api/export/pdf" target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    <FileText className="h-4 w-4 mr-2" /> Generate Financial Report (PDF)
-                  </Button>
-                </a>
+                </div>
+              </form>
+
+              {/* Members List */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Workspace Members</h4>
+                <div className="divide-y border rounded-xl overflow-hidden">
+                  {members.map((m) => (
+                    <div key={m.id} className="p-3 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-brand-teal" />
+                        <div>
+                          <p className="font-semibold text-foreground">{m.userId}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Joined {new Date(m.joinedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{m.role}</Badge>
+                        {m.role !== "OWNER" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeMemberMutation.mutate(m.id)}
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data Export & Backups */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold">Data Export & Historical Snapshots</CardTitle>
+              <CardDescription className="text-xs">Download full financial records in CSV or PDF formats</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => window.open("/api/export/csv", "_blank")}
+                  className="h-20 flex flex-col items-center justify-center gap-1.5 border-dashed"
+                >
+                  <FileText className="h-5 w-5 text-brand-teal" />
+                  <span className="font-semibold text-xs">Export CSV Ledger</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => window.open("/api/export/pdf", "_blank")}
+                  className="h-20 flex flex-col items-center justify-center gap-1.5 border-dashed"
+                >
+                  <Download className="h-5 w-5 text-brand-teal" />
+                  <span className="font-semibold text-xs">Export PDF Statement</span>
+                </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => triggerSnapshotMutation.mutate()}
                   disabled={triggerSnapshotMutation.isPending}
+                  className="h-20 flex flex-col items-center justify-center gap-1.5 border-dashed"
                 >
-                  <Camera className="h-4 w-4 mr-2" /> Take Net Worth Snapshot Now
+                  <Camera className="h-5 w-5 text-amber-500" />
+                  <span className="font-semibold text-xs">Record Net Worth Snapshot</span>
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Raw CSV files export all filterable transaction rows. PDF reports generate printable monthly net worth statements formatted for archiving.
-              </p>
             </CardContent>
           </Card>
         </div>

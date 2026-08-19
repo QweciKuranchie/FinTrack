@@ -4,11 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import {
   Compass,
   TrendingUp,
   CreditCard,
-  ArrowDownRight,
   Wallet,
   HandCoins,
   RefreshCw,
@@ -30,6 +30,9 @@ import {
   Menu,
   Plus,
   ArrowLeftRight,
+  Sun,
+  Moon,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -61,7 +64,6 @@ const sidebarSections: NavSection[] = [
     title: "FINANCIAL CATEGORY",
     items: [
       { name: "Transactions", href: "/transactions", icon: ArrowLeftRight },
-      { name: "Expenses", href: "/expenses", icon: ArrowDownRight },
       { name: "Budget", href: "/budgets", icon: Wallet },
       { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
       { name: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
@@ -87,7 +89,7 @@ const sidebarSections: NavSection[] = [
   {
     title: "INTEGRATIONS",
     items: [
-      { name: "Bank Sync", href: "/accounts", icon: Landmark },
+      { name: "Momo & Bank Sync", href: "/accounts", icon: Landmark },
       { name: "CSV Import", action: "CSV_IMPORT", icon: FileSpreadsheet },
     ],
   },
@@ -102,6 +104,7 @@ const sidebarSections: NavSection[] = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [loggingOut, setLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
@@ -178,10 +181,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mt-2 rounded-xl bg-popover border border-border p-1.5 shadow-xl text-sm font-medium text-popover-foreground space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
             <button
               onClick={() => setIsWorkspaceDropdownOpen(false)}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted transition-colors text-foreground"
+              className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors text-foreground"
             >
-              <User className="h-4 w-4 text-brand-teal" />
-              <span>Personal Finance</span>
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-brand-teal" />
+                <span>Personal Workspace</span>
+              </div>
+              <span className="h-2 w-2 rounded-full bg-brand-teal" />
+            </button>
+
+            <button
+              onClick={() => setIsWorkspaceDropdownOpen(false)}
+              className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-teal-600" />
+                <span>Family Workspace</span>
+              </div>
             </button>
 
             <div className="border-t border-border my-1" />
@@ -192,10 +208,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setIsWorkspaceDropdownOpen(false);
                 setIsMobileMenuOpen(false);
               }}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-xs"
             >
-              <Settings className="h-4 w-4" />
-              <span>Manage Workspaces</span>
+              <Plus className="h-3.5 w-3.5 text-brand-teal" />
+              <span>+ Create / Manage Workspaces</span>
             </Link>
           </div>
         )}
@@ -288,29 +304,50 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header Bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border text-foreground flex items-center justify-between px-4 z-40 shadow-xs">
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-1.5 rounded-lg hover:bg-muted text-foreground"
-          aria-label="Open menu"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
-
+      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border text-foreground flex items-center justify-between px-3 z-40 shadow-xs">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-teal/15 text-brand-teal">
-            <Wallet className="h-4 w-4" />
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-1.5 rounded-lg hover:bg-muted text-foreground"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-teal/15 text-brand-teal">
+              <Wallet className="h-3.5 w-3.5" />
+            </div>
+            <span className="font-bold text-base tracking-tight">FinTrack</span>
           </div>
-          <span className="font-bold text-lg tracking-tight">FinTrack</span>
         </div>
 
-        <button
-          onClick={() => setIsQuickAddOpen(true)}
-          className="p-1.5 rounded-lg hover:bg-muted text-brand-teal"
-          aria-label="Add expense"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
+        {/* Mobile Header Right Controls: Theme Toggle, Notifications, Profile */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+
+          <button
+            onClick={() => router.push("/notifications")}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground relative"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-brand-teal" />
+          </button>
+
+          <button
+            onClick={() => router.push("/settings")}
+            className="p-1.5 rounded-lg hover:bg-muted text-brand-teal"
+            aria-label="Profile"
+          >
+            <User className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       {/* Mobile Sidebar Overlay Drawer */}
@@ -327,45 +364,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 md:pl-64 pt-14 md:pt-0 pb-20 md:pb-8">
+      <main className="flex-1 md:pl-64 pt-14 md:pt-0 pb-8">
         <div className="max-w-6xl mx-auto p-4 md:p-8">{children}</div>
       </main>
 
       {/* Mobile Floating Add Button */}
       <button
         onClick={() => setIsQuickAddOpen(true)}
-        className="fixed right-5 bottom-20 md:bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-teal text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
+        className="fixed right-5 bottom-6 md:bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-teal text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
         aria-label="Quick add transaction"
       >
         <Plus className="h-6 w-6" />
       </button>
-
-      {/* Mobile Bottom Tab Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t bg-card/95 backdrop-blur-md flex items-center justify-around z-30 px-2">
-        {[
-          { name: "Dashboard", href: "/dashboard", icon: Compass },
-          { name: "Accounts", href: "/accounts", icon: Landmark },
-          { name: "Transactions", href: "/transactions", icon: ArrowLeftRight },
-          { name: "Budgets", href: "/budgets", icon: Wallet },
-          { name: "Net Worth", href: "/net-worth", icon: Scale },
-        ].map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center w-full py-1 text-xs font-medium transition-colors",
-                isActive ? "text-brand-teal font-bold" : "text-muted-foreground"
-              )}
-            >
-              <Icon className="h-5 w-5 mb-0.5" />
-              <span className="truncate max-w-[64px]">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
 
       {/* Quick Transaction Modal */}
       <QuickTransactionModal
