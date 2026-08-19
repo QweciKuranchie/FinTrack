@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import {
   User,
   Sun,
@@ -24,7 +25,11 @@ import {
   Camera,
   Settings2,
   Database,
+  AlertTriangle,
+  Save,
+  Globe,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface Category {
   id: string;
@@ -42,16 +47,31 @@ interface HouseholdMember {
   joinedAt: string;
 }
 
+interface UserProfileData {
+  id: string;
+  email: string;
+  name: string;
+  username: string;
+  workspaceName: string;
+  workspaceCreatedAt: string;
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
 
   // Tabs: Profile, Custom Category, App Preference, Account and Data
   const [activeTab, setActiveTab] = useState<"profile" | "categories" | "preferences" | "account_data">("profile");
 
-  // Profile Form State
-  const [baseCurrency, setBaseCurrency] = useState("GHS");
+  // Editable Profile Form State
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
+
+  // App Preference State
+  const [baseCurrency, setBaseCurrency] = useState("GHS");
 
   // Category Form State
   const [catName, setCatName] = useState("");
@@ -63,6 +83,24 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<"OWNER" | "MEMBER">("MEMBER");
 
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch User Profile
+  const { data: profileResponse } = useQuery<{ data: UserProfileData }>({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const res = await fetch("/api/user/profile");
+      if (!res.ok) throw new Error("Failed to fetch user profile");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (profileResponse?.data) {
+      setFullName(profileResponse.data.name || "");
+      setUsername(profileResponse.data.username || "");
+      setWorkspaceName(profileResponse.data.workspaceName || "");
+    }
+  }, [profileResponse]);
 
   // Queries
   const { data: categoriesData } = useQuery<{ data: Category[] }>({
@@ -89,7 +127,43 @@ export default function SettingsPage() {
   const householdInfo = householdData?.data;
   const members = householdInfo?.members ?? [];
 
-  // Mutations
+  // Profile Save Mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (payload: { name: string; username: string; workspaceName: string }) => {
+      const res = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to update profile");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["household-members"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setProfileSuccessMsg("Profile and workspace details saved successfully!");
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  // Account Delete Mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/user/delete", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete account");
+      return res.json();
+    },
+    onSuccess: async () => {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push("/login");
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  // Category Mutations
   const createCategoryMutation = useMutation({
     mutationFn: async (payload: { name: string; type: "INCOME" | "EXPENSE"; color: string }) => {
       const res = await fetch("/api/categories", {
@@ -161,6 +235,15 @@ export default function SettingsPage() {
     },
   });
 
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMutation.mutate({
+      name: fullName,
+      username,
+      workspaceName,
+    });
+  };
+
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
     createCategoryMutation.mutate({
@@ -187,7 +270,7 @@ export default function SettingsPage() {
             <Settings2 className="h-7 w-7 text-brand-teal" /> Settings & Preferences
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage profile settings, custom categories, theme preferences, workspaces, and data backups
+            Manage profile settings, custom categories, app preferences, workspaces, and account data
           </p>
         </div>
       </div>
@@ -252,53 +335,89 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      {/* TAB 1: Profile Settings */}
+      {/* TAB 1: Profile Settings (Editable User Information) */}
       {activeTab === "profile" && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-bold">User Profile Information</CardTitle>
-              <CardDescription className="text-xs">Your personal account details and primary currency preferences</CardDescription>
+              <CardTitle className="text-base font-bold">User Information & Profile</CardTitle>
+              <CardDescription className="text-xs">
+                Update your personal name, username, and active workspace details
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4 border-b pb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-teal text-white font-bold text-lg">
-                  {householdInfo?.household?.name?.[0] || "U"}
+            <CardContent>
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="flex items-center gap-4 border-b pb-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-teal text-white font-bold text-xl shadow-sm">
+                    {fullName?.[0] || "U"}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">{fullName || "User Name"}</h3>
+                    <p className="text-xs text-muted-foreground">@{username || "username"}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-base">{householdInfo?.household?.name || "User Account"}</h3>
-                  <p className="text-xs text-muted-foreground">Active Workspace: {householdInfo?.household?.name || "Personal Workspace"}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="pref-currency">Primary Base Currency</Label>
-                  <select
-                    id="pref-currency"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                    value={baseCurrency}
-                    onChange={(e) => setBaseCurrency(e.target.value)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="full-name">Full Name</Label>
+                    <Input
+                      id="full-name"
+                      placeholder="e.g. Qweci Kuranchie"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="user-handle">Username</Label>
+                    <Input
+                      id="user-handle"
+                      placeholder="e.g. qweci"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="workspace-name">Active Workspace Name</Label>
+                    <Input
+                      id="workspace-name"
+                      placeholder="e.g. Personal Finance Workspace"
+                      value={workspaceName}
+                      onChange={(e) => setWorkspaceName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Date Workspace Was Created</Label>
+                    <Input
+                      readOnly
+                      value={
+                        profileResponse?.data?.workspaceCreatedAt
+                          ? new Date(profileResponse.data.workspaceCreatedAt).toLocaleDateString()
+                          : householdInfo?.household?.createdAt
+                          ? new Date(householdInfo.household.createdAt).toLocaleDateString()
+                          : "---"
+                      }
+                      className="bg-muted/40 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="submit"
+                    className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-xs"
+                    disabled={updateProfileMutation.isPending}
                   >
-                    <option value="GHS">GHS — Ghana Cedi (₵)</option>
-                    <option value="USD">USD — US Dollar ($)</option>
-                    <option value="EUR">EUR — Euro (€)</option>
-                    <option value="GBP">GBP — British Pound (£)</option>
-                  </select>
+                    <Save className="h-4 w-4 mr-1.5" />
+                    {updateProfileMutation.isPending ? "Saving..." : "Save Profile Details"}
+                  </Button>
                 </div>
-                <div className="space-y-1">
-                  <Label>Workspace Created At</Label>
-                  <Input
-                    readOnly
-                    value={
-                      householdInfo?.household?.createdAt
-                        ? new Date(householdInfo.household.createdAt).toLocaleDateString()
-                        : "---"
-                    }
-                    className="bg-muted/40"
-                  />
-                </div>
-              </div>
+              </form>
             </CardContent>
           </Card>
         </div>
@@ -398,21 +517,51 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* TAB 3: App Preference */}
+      {/* TAB 3: App Preference (Base Currency & Theme Mode) */}
       {activeTab === "preferences" && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-bold">Appearance & Theme Preference</CardTitle>
-              <CardDescription className="text-xs">Select your preferred color theme mode across all devices</CardDescription>
+              <CardTitle className="text-base font-bold">Primary Base Currency</CardTitle>
+              <CardDescription className="text-xs">
+                Select your default currency for cross-currency calculations and dashboard totals
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="max-w-md space-y-2">
+                <Label htmlFor="pref-currency flex items-center gap-1">
+                  <Globe className="h-4 w-4 text-brand-teal" /> Default Display Currency
+                </Label>
+                <select
+                  id="pref-currency"
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={baseCurrency}
+                  onChange={(e) => {
+                    setBaseCurrency(e.target.value);
+                    setProfileSuccessMsg(`Primary base currency set to ${e.target.value}`);
+                  }}
+                >
+                  <option value="GHS">GHS — Ghana Cedi (₵)</option>
+                  <option value="USD">USD — US Dollar ($)</option>
+                  <option value="EUR">EUR — Euro (€)</option>
+                  <option value="GBP">GBP — British Pound (£)</option>
+                </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold">Appearance & Theme Mode</CardTitle>
+              <CardDescription className="text-xs">Select interface mode for light theme, dark theme, or system default</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-3 max-w-md">
                 <button
                   onClick={() => setTheme("light")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex flex-col items-center gap-2 p-3.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     theme === "light"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal shadow-xs"
                       : "border-input hover:bg-muted"
                   }`}
                 >
@@ -421,9 +570,9 @@ export default function SettingsPage() {
 
                 <button
                   onClick={() => setTheme("dark")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex flex-col items-center gap-2 p-3.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     theme === "dark"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal shadow-xs"
                       : "border-input hover:bg-muted"
                   }`}
                 >
@@ -432,9 +581,9 @@ export default function SettingsPage() {
 
                 <button
                   onClick={() => setTheme("system")}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex flex-col items-center gap-2 p-3.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     theme === "system"
-                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal"
+                      ? "border-brand-teal bg-teal-50/50 dark:bg-teal-950/40 text-brand-teal shadow-xs"
                       : "border-input hover:bg-muted"
                   }`}
                 >
@@ -446,7 +595,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* TAB 4: Account and Data */}
+      {/* TAB 4: Account and Data (Workspaces, Export, & Account Deletion) */}
       {activeTab === "account_data" && (
         <div className="space-y-6">
           {/* Workspaces & Team Sharing */}
@@ -455,11 +604,11 @@ export default function SettingsPage() {
               <div>
                 <CardTitle className="text-base font-bold">Workspace & Team Sharing</CardTitle>
                 <CardDescription className="text-xs">
-                  Manage multiple financial workspaces (Personal, Family, Business) and collaborators
+                  Manage collaborators for active workspace ({workspaceName || householdInfo?.household?.name || "Personal Workspace"})
                 </CardDescription>
               </div>
               <Badge variant="teal" className="text-xs">
-                Active: {householdInfo?.household?.name || "Personal Workspace"}
+                Active: {workspaceName || householdInfo?.household?.name || "Personal Workspace"}
               </Badge>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -558,6 +707,40 @@ export default function SettingsPage() {
                 >
                   <Camera className="h-5 w-5 text-amber-500" />
                   <span className="font-semibold text-xs">Record Net Worth Snapshot</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Danger Zone: Account Deletion */}
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                <CardTitle className="text-base font-bold">Danger Zone: Account Deletion</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Permanently delete your account, workspace records, and wipe all financial data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-xs text-muted-foreground">
+                  Once deleted, your account and linked workspace data cannot be recovered.
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm("Are you sure you want to PERMANENTLY delete your account and wipe all workspace data? This action CANNOT be undone.")) {
+                      deleteAccountMutation.mutate();
+                    }
+                  }}
+                  disabled={deleteAccountMutation.isPending}
+                  className="shrink-0 font-bold"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account & Wipe Data"}
                 </Button>
               </div>
             </CardContent>

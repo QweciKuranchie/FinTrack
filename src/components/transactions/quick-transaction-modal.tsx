@@ -22,6 +22,7 @@ export function QuickTransactionModal({
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id || "");
+  const [transferAccountId, setTransferAccountId] = useState(accounts[1]?.id || "");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -50,8 +51,19 @@ export function QuickTransactionModal({
     }
 
     if (!accountId) {
-      setError("Please select an account");
+      setError("Please select the source account");
       return;
+    }
+
+    if (type === "TRANSFER") {
+      if (!transferAccountId) {
+        setError("Please select the destination transfer account");
+        return;
+      }
+      if (accountId === transferAccountId) {
+        setError("Source account and destination transfer account must be different");
+        return;
+      }
     }
 
     setLoading(true);
@@ -68,6 +80,7 @@ export function QuickTransactionModal({
           type,
           description: description || null,
           date,
+          transferAccountId: type === "TRANSFER" ? transferAccountId : null,
         }),
       });
 
@@ -94,15 +107,15 @@ export function QuickTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl border">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl border animate-in fade-in zoom-in-95">
         <h2 className="text-xl font-bold tracking-tight mb-1">Quick Log Transaction</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Add an income, expense, or transfer transaction
+          Record an income, expense outcoming, or account-to-account transfer
         </p>
 
         {error && (
-          <div className="mb-4 rounded-md bg-destructive/15 p-3 text-xs text-destructive">
+          <div className="mb-4 rounded-xl bg-destructive/10 p-3 text-xs text-destructive font-medium border border-destructive/20">
             {error}
           </div>
         )}
@@ -114,9 +127,9 @@ export function QuickTransactionModal({
               <button
                 key={t}
                 type="button"
-                className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                className={`py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer ${
                   type === t
-                    ? "bg-brand-teal text-white border-brand-teal"
+                    ? "bg-brand-teal text-white border-brand-teal shadow-xs"
                     : "bg-background text-muted-foreground hover:bg-muted"
                 }`}
                 onClick={() => setType(t)}
@@ -140,30 +153,71 @@ export function QuickTransactionModal({
             />
           </div>
 
-          {/* Account */}
-          <div className="space-y-1">
-            <Label htmlFor="account">Account</Label>
-            <select
-              id="account"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              required
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.currency})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Transfer Accounts (From & To) or Single Account */}
+          {type === "TRANSFER" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="account">Transfer From (Source Account)</Label>
+                <select
+                  id="account"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  required
+                >
+                  <option value="">Select Source Account</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="transferAccount">Transfer To (Destination Account)</Label>
+                <select
+                  id="transferAccount"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                  value={transferAccountId}
+                  onChange={(e) => setTransferAccountId(e.target.value)}
+                  required
+                >
+                  <option value="">Select Target Account</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label htmlFor="account">Account</Label>
+              <select
+                id="account"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                required
+              >
+                <option value="">Select Account</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.currency})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Category */}
           <div className="space-y-1">
             <Label htmlFor="category">Category</Label>
             <select
               id="category"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
             >
@@ -194,7 +248,7 @@ export function QuickTransactionModal({
             <Input
               id="description"
               type="text"
-              placeholder="Lunch, Groceries, Uber..."
+              placeholder="e.g. Bank to MoMo transfer, Lunch, Salary..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -206,7 +260,7 @@ export function QuickTransactionModal({
             </Button>
             <Button
               type="submit"
-              className="bg-brand-teal text-white hover:bg-brand-teal/90"
+              className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-xs"
               disabled={loading}
             >
               {loading ? "Saving..." : "Save Transaction"}
