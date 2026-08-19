@@ -4,15 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
-export const dynamicParams = true;
-export const revalidate = 0;
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Liability ID is required" } }, { status: 400 });
@@ -44,10 +41,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Liability ID is required" } }, { status: 400 });
@@ -72,13 +68,14 @@ export async function PATCH(
       where: { id },
       data: {
         name: json.name ?? existingLiability.name,
+        counterparty: json.counterparty !== undefined ? json.counterparty : existingLiability.counterparty,
+        isReceivable: json.isReceivable !== undefined ? Boolean(json.isReceivable) : existingLiability.isReceivable,
         type: json.type ?? existingLiability.type,
         principal: json.principal !== undefined ? new Prisma.Decimal(json.principal) : existingLiability.principal,
         currentBalance: json.currentBalance !== undefined ? new Prisma.Decimal(json.currentBalance) : existingLiability.currentBalance,
-        interestRate: json.interestRate !== undefined ? (json.interestRate ? new Prisma.Decimal(json.interestRate) : null) : existingLiability.interestRate,
-        minimumPayment: json.minimumPayment !== undefined ? (json.minimumPayment ? new Prisma.Decimal(json.minimumPayment) : null) : existingLiability.minimumPayment,
-        dueDate: json.dueDate !== undefined ? json.dueDate : existingLiability.dueDate,
+        dueDate: json.dueDate !== undefined ? (json.dueDate ? parseInt(json.dueDate, 10) : null) : existingLiability.dueDate,
         currency: json.currency ?? existingLiability.currency,
+        notes: json.notes !== undefined ? json.notes : existingLiability.notes,
       },
     });
 
@@ -94,10 +91,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Liability ID is required" } }, { status: 400 });
@@ -114,7 +110,7 @@ export async function DELETE(
     });
 
     if (!existingLiability) {
-      return NextResponse.json({ error: { message: "Liability not found" } }, { status: 404 });
+      return NextResponse.json({ error: { message: "Account not found" } }, { status: 404 });
     }
 
     await prisma.liability.delete({

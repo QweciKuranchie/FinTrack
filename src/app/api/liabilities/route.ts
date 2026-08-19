@@ -1,26 +1,46 @@
 import { NextResponse } from "next/server";
 import { getAuthUser, getOrCreateHouseholdForUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { liabilitySchema } from "@/lib/validation/assets-liabilities";
 import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
     }
 
-    const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const liabilities = await prisma.liability.findMany({
-      where: { householdId: household.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const skip = (page - 1) * limit;
 
-    return NextResponse.json({ data: liabilities });
+    const household = await getOrCreateHouseholdForUser(user.id, user.email);
+
+    const [liabilities, totalCount] = await Promise.all([
+      prisma.liability.findMany({
+        where: { householdId: household.id },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.liability.count({
+        where: { householdId: household.id },
+      }),
+    ]);
+
+    return NextResponse.json({
+      data: liabilities,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("GET /api/liabilities error:", error);
     return NextResponse.json(
@@ -38,37 +58,39 @@ export async function POST(request: Request) {
     }
 
     const json = await request.json();
-    const validation = liabilitySchema.safeParse(json);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: { message: "Validation error", details: validation.error.flatten() } },
-        { status: 400 }
-      );
-    }
-
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
+
     const {
       name,
+      counterparty,
+      isReceivable,
       type,
       principal,
       currentBalance,
-      interestRate,
-      minimumPayment,
       dueDate,
+      notes,
       currency,
-    } = validation.data;
+    } = json;
+
+    if (!name || principal === undefined || principal === null) {
+      return NextResponse.json(
+        { error: { message: "Name and principal amount are required" } },
+        { status: 400 }
+      );
+    }
 
     const liability = await prisma.liability.create({
       data: {
         householdId: household.id,
         name,
-        type,
+        counterparty: counterparty || null,
+        isReceivable: Boolean(isReceivable),
+        type: type || "OTHER",
         principal: new Prisma.Decimal(principal),
-        currentBalance: new Prisma.Decimal(currentBalance),
-        interestRate: interestRate !== null && interestRate !== undefined ? new Prisma.Decimal(interestRate) : null,
-        minimumPayment: minimumPayment !== null && minimumPayment !== undefined ? new Prisma.Decimal(minimumPayment) : null,
-        dueDate: dueDate || null,
-        currency,
+        currentBalance: new Prisma.Decimal(currentBalance !== undefined && currentBalance !== null ? currentBalance : principal),
+        dueDate: dueDate ? parseInt(dueDate, 10) : null,
+        currency: currency || "GHS",
+        notes: notes || null,
       },
     });
 
@@ -76,7 +98,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/liabilities error:", error);
     return NextResponse.json(
-      { error: { message: "Failed to create liability" } },
+      { error: { message: "Failed to create liability record" } },
       { status: 500 }
     );
   }
