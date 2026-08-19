@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         type: type || "OTHER",
         principal: new Prisma.Decimal(principal),
         currentBalance: new Prisma.Decimal(currentBalance !== undefined && currentBalance !== null ? currentBalance : principal),
-        dueDate: dueDate ? parseInt(dueDate, 10) : null,
+        dueDate: dueDate ? new Date(dueDate) : null,
         currency: currency || "GHS",
         notes: notes || null,
       },

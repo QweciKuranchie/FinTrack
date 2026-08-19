@@ -61,9 +61,11 @@ model Account {
 }
 
 enum AccountType {
+  BANK
   CHECKING
   SAVINGS
   MOBILE_MONEY
+  TELECEL_CASH
   CASH
   INVESTMENT
   OTHER
@@ -130,7 +132,7 @@ model Liability {
   currentBalance Decimal
   interestRate   Decimal?
   minimumPayment Decimal?
-  dueDate        Int?          // day of month
+  dueDate        DateTime?
   currency       String        @default("GHS")
   notes          String?
   createdAt      DateTime      @default(now())
@@ -146,13 +148,17 @@ enum LiabilityType {
 }
 
 model Asset {
-  id           String    @id @default(uuid())
-  householdId  String
-  name         String
-  type         AssetType
-  currentValue Decimal
-  currency     String
-  lastValuedAt DateTime  @default(now())
+  id            String    @id @default(uuid())
+  householdId   String
+  name          String
+  symbol        String?
+  type          AssetType
+  quantity      Decimal?
+  purchasePrice Decimal?
+  currentValue  Decimal
+  currency      String    @default("GHS")
+  notes         String?
+  lastValuedAt  DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id])
 }

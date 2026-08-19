@@ -44,9 +44,13 @@ export default function AssetsPage() {
 
   // Form State
   const [name, setName] = useState("");
+  const [symbol, setSymbol] = useState("");
   const [type, setType] = useState<"PROPERTY" | "VEHICLE" | "INVESTMENT" | "OTHER">("PROPERTY");
+  const [quantity, setQuantity] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [currentValue, setCurrentValue] = useState("");
   const [currency, setCurrency] = useState("GHS");
+  const [notes, setNotes] = useState("");
 
   // Fetch real-time assets with pagination
   const { data: assetsResponse, isLoading, isError } = useQuery<{
@@ -81,7 +85,16 @@ export default function AssetsPage() {
 
   // Create Asset Mutation
   const createMutation = useMutation({
-    mutationFn: async (payload: { name: string; type: string; currentValue: number; currency: string }) => {
+    mutationFn: async (payload: {
+      name: string;
+      symbol?: string | null;
+      type: string;
+      quantity?: number | null;
+      purchasePrice?: number | null;
+      currentValue: number;
+      currency: string;
+      notes?: string | null;
+    }) => {
       const res = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,9 +131,13 @@ export default function AssetsPage() {
 
     createMutation.mutate({
       name,
+      symbol: symbol || null,
       type,
+      quantity: quantity ? parseFloat(quantity) : null,
+      purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
       currentValue: parseFloat(currentValue),
       currency,
+      notes: notes || null,
     });
   };
 
@@ -342,20 +359,32 @@ export default function AssetsPage() {
               Record property, vehicles, or physical asset valuations
             </p>
 
-            <form onSubmit={handleCreateAsset} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Asset Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. 4-Bedroom House in East Legon or Toyota RAV4"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+            <form onSubmit={handleCreateAsset} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="symbol">Asset Symbol (Optional)</Label>
+                  <Input
+                    id="symbol"
+                    placeholder="e.g. AAPL or PROP-01"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="name">Asset Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. East Legon Property, Tesla Model Y"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label htmlFor="type">Asset Type</Label>
                   <select
                     id="type"
@@ -370,7 +399,7 @@ export default function AssetsPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <Label htmlFor="currency">Currency</Label>
                   <select
                     id="currency"
@@ -386,8 +415,34 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="currentValue">Current Valuation Amount</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="quantity">Quantity (Optional)</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    step="0.01"
+                    placeholder="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="purchasePrice">Purchase Price (Optional)</Label>
+                  <Input
+                    id="purchasePrice"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={purchasePrice}
+                    onChange={(e) => setPurchasePrice(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="currentValue">Current Market Price / Value</Label>
                 <Input
                   id="currentValue"
                   type="number"
@@ -396,6 +451,16 @@ export default function AssetsPage() {
                   value={currentValue}
                   onChange={(e) => setCurrentValue(e.target.value)}
                   required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Input
+                  id="notes"
+                  placeholder="Additional details or location"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
 

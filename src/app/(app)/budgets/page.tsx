@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, PieChart, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Wallet, AlertTriangle, CheckCircle2, PieChart } from "lucide-react";
 
 interface Category {
   id: string;
@@ -92,27 +92,31 @@ export default function BudgetsPage() {
   const categories = (categoriesData?.data ?? []).filter((c) => c.type === "EXPENSE");
   const budgets = budgetsData?.data ?? [];
 
+  // Calculate Budget Overview Totals
+  const totalBudgeted = budgets.reduce((sum, b) => sum + Number(b.budgetAmount || 0), 0);
+  const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spentAmount || 0), 0);
+  const remainingBudget = totalBudgeted - totalSpent;
+  const overallBurnPct = totalBudgeted > 0 ? Math.min(100, Math.round((totalSpent / totalBudgeted) * 100)) : 0;
+
   const getProgressColor = (percentage: number) => {
     if (percentage > 100) return "bg-red-500";
     if (percentage >= 70) return "bg-amber-500";
     return "bg-teal-600";
   };
 
-  const getBadgeVariant = (percentage: number) => {
-    if (percentage > 100) return "destructive" as const;
-    if (percentage >= 70) return "amber" as const;
-    return "teal" as const;
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header Bar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Monthly Budgets</h1>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
+            <Wallet className="h-7 w-7 text-brand-teal" /> Category Budgets
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Set category limits for this month and monitor spending progress
+            Set monthly spending limits by category and track burn rates in real time
           </p>
         </div>
+
         <Button
           onClick={() => setIsSettingBudget(!isSettingBudget)}
           className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-sm"
@@ -121,26 +125,90 @@ export default function BudgetsPage() {
         </Button>
       </div>
 
+      {/* Budget Overview Hero Section */}
+      <Card className="border-teal-900/10 bg-gradient-to-r from-teal-950/10 via-card to-amber-950/10 shadow-sm">
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-teal text-white">
+                <PieChart className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold">Budget Overview</CardTitle>
+                <CardDescription className="text-xs">
+                  Monthly allocation summary across all categories
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant={overallBurnPct >= 100 ? "destructive" : "teal"}>
+              {overallBurnPct}% Burn Rate
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Budgeted</p>
+              <p className="text-2xl font-extrabold text-foreground mt-0.5">
+                GHS {totalBudgeted.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground">Monthly allocation sum</p>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Spent</p>
+              <p className="text-2xl font-extrabold text-destructive mt-0.5">
+                GHS {totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground">Category outgoings</p>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Remaining Budget</p>
+              <p className={`text-2xl font-extrabold mt-0.5 ${remainingBudget >= 0 ? "text-teal-600 dark:text-teal-400" : "text-destructive"}`}>
+                GHS {remainingBudget.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground">Unspent monthly allowance</p>
+            </div>
+          </div>
+
+          {/* Overall Burn Rate Progress Bar */}
+          <div className="space-y-1.5 pt-2">
+            <div className="flex justify-between text-xs text-muted-foreground font-medium">
+              <span>Overall Monthly Budget Progress</span>
+              <span>{overallBurnPct}% Used</span>
+            </div>
+            <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${getProgressColor(overallBurnPct)}`}
+                style={{ width: `${overallBurnPct}%` }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Set Budget Form Modal Card */}
       {isSettingBudget && (
-        <Card className="border-brand-teal/30">
-          <CardHeader>
-            <CardTitle className="text-base">Set Monthly Budget</CardTitle>
-            <CardDescription>Target maximum spend for a category this month</CardDescription>
+        <Card className="border-brand-teal/40">
+          <CardHeader className="py-4">
+            <CardTitle className="text-base">Set Monthly Category Limit</CardTitle>
           </CardHeader>
           <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 pb-4">
               {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="budget-cat">Category</Label>
+                  <Label htmlFor="category">Category</Label>
                   <select
-                    id="budget-cat"
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    id="category"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                     required
                   >
-                    <option value="">-- Select Expense Category --</option>
+                    <option value="">Select Expense Category</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -148,10 +216,11 @@ export default function BudgetsPage() {
                     ))}
                   </select>
                 </div>
+
                 <div className="space-y-1">
-                  <Label htmlFor="budget-amt">Monthly Limit (GHS)</Label>
+                  <Label htmlFor="budget-amount">Monthly Budget Amount (GHS)</Label>
                   <Input
-                    id="budget-amt"
+                    id="budget-amount"
                     type="number"
                     step="0.01"
                     placeholder="0.00"
@@ -167,7 +236,7 @@ export default function BudgetsPage() {
                   Cancel
                 </Button>
                 <Button type="submit" size="sm" className="bg-brand-teal text-white">
-                  Save Budget
+                  {setBudgetMutation.isPending ? "Saving..." : "Save Budget"}
                 </Button>
               </div>
             </CardContent>
@@ -175,65 +244,67 @@ export default function BudgetsPage() {
         </Card>
       )}
 
+      {/* Category Budgets Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="h-32 animate-pulse bg-muted/40" />
           ))}
         </div>
       ) : budgets.length === 0 ? (
-        <Card className="p-8 text-center border-dashed">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-brand-teal mb-3">
-            <PieChart className="h-6 w-6" />
-          </div>
-          <h3 className="text-lg font-semibold mb-1">No Category Budgets Set</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Set budget limits for categories like Food, Transport, or Utilities to track spend.
-          </p>
-          <Button onClick={() => setIsSettingBudget(true)} className="bg-brand-teal text-white">
-            Set Your First Budget
-          </Button>
+        <Card className="p-8 text-center text-sm text-muted-foreground border-dashed">
+          <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
+          <p className="font-semibold">No category budgets set for this month.</p>
+          <p className="text-xs mt-1">Click &quot;Set Category Budget&quot; to assign monthly limits.</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgets.map((item) => (
-            <Card key={item.id} className="hover:border-brand-teal/30 transition-colors">
-              <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-semibold">{item.categoryName}</CardTitle>
-                <Badge variant={getBadgeVariant(item.percentage)}>{item.percentage}%</Badge>
-              </CardHeader>
-              <CardContent className="p-4 pt-1 space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    Spent: <strong className="text-foreground">GHS {item.spentAmount.toFixed(2)}</strong>
-                  </span>
-                  <span className="text-muted-foreground">Budget: GHS {item.budgetAmount.toFixed(2)}</span>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {budgets.map((b) => {
+            const isOver = b.percentage > 100;
+            const remaining = b.budgetAmount - b.spentAmount;
 
-                {/* Progress bar */}
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${getProgressColor(item.percentage)}`}
-                    style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                  />
-                </div>
+            return (
+              <Card key={b.id} className={`relative ${isOver ? "border-red-500/40" : ""}`}>
+                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isOver ? (
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-teal-600" />
+                    )}
+                    <span className="font-semibold text-sm">{b.categoryName}</span>
+                  </div>
+                  <Badge variant={isOver ? "destructive" : "teal"} className="text-[10px]">
+                    {b.percentage}%
+                  </Badge>
+                </CardHeader>
 
-                <div className="flex items-center gap-1 text-[11px]">
-                  {item.percentage > 100 ? (
-                    <span className="text-destructive font-medium flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" /> Over budget by GHS{" "}
-                      {(item.spentAmount - item.budgetAmount).toFixed(2)}
+                <CardContent className="p-4 pt-1 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Spent: {b.currency} {b.spentAmount.toFixed(2)}
                     </span>
-                  ) : (
-                    <span className="text-teal-600 dark:text-teal-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> GHS{" "}
-                      {(item.budgetAmount - item.spentAmount).toFixed(2)} remaining
+                    <span className="font-medium">
+                      Budget: {b.currency} {b.budgetAmount.toFixed(2)}
                     </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </div>
+
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${getProgressColor(b.percentage)}`}
+                      style={{ width: `${Math.min(100, b.percentage)}%` }}
+                    />
+                  </div>
+
+                  <p className={`text-[11px] font-medium mt-1 ${remaining < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {remaining < 0
+                      ? `Over budget by ${b.currency} ${Math.abs(remaining).toFixed(2)}`
+                      : `${b.currency} ${remaining.toFixed(2)} remaining`}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
