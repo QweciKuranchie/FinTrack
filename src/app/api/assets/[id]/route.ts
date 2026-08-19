@@ -4,15 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
-export const dynamicParams = true;
-export const revalidate = 0;
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Asset ID is required" } }, { status: 400 });
@@ -44,10 +41,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Asset ID is required" } }, { status: 400 });
@@ -91,10 +87,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const params = context?.params ? await Promise.resolve(context.params) : { id: "" };
     const id = params?.id;
     if (!id) {
       return NextResponse.json({ error: { message: "Asset ID is required" } }, { status: 400 });

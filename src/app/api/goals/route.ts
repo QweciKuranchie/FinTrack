@@ -7,19 +7,32 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: { message: "Unauthorized" } }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const skip = (page - 1) * limit;
+
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
-    const goals = await prisma.savingsGoal.findMany({
-      where: { householdId: household.id },
-      include: { account: true },
-      orderBy: { createdAt: "desc" },
-    });
+
+    const [goals, totalCount] = await Promise.all([
+      prisma.savingsGoal.findMany({
+        where: { householdId: household.id },
+        include: { account: true },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.savingsGoal.count({
+        where: { householdId: household.id },
+      }),
+    ]);
 
     const goalsWithProgress = goals.map((g) => {
       const target = Number(g.targetAmount);
@@ -33,7 +46,15 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ data: goalsWithProgress });
+    return NextResponse.json({
+      data: goalsWithProgress,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("GET /api/goals error:", error);
     return NextResponse.json(
