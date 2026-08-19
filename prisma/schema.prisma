@@ -24,6 +24,7 @@ model Household {
   budgets       Budget[]
   snapshots     NetWorthSnapshot[]
   savingsGoals  SavingsGoal[]
+  debtRecords   DebtRecord[]
 }
 
 model HouseholdMember {
@@ -154,6 +155,22 @@ enum LiabilityType {
   CREDIT_CARD
   MORTGAGE
   OTHER
+}
+
+model DebtRecord {
+  id             String    @id @default(uuid())
+  householdId    String
+  title          String
+  counterparty   String
+  isReceivable   Boolean   @default(false)
+  amount         Decimal
+  currentBalance Decimal
+  dueDate        DateTime?
+  currency       String    @default("GHS")
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id])
 }
 
 model Asset {
