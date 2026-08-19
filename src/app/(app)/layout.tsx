@@ -110,6 +110,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(3);
+  const [notificationsList, setNotificationsList] = useState([
+    { id: "1", title: "Subscription Due Soon", desc: "Netflix Premium renewal due in 3 days ($15.99)", time: "2h ago", unread: true },
+    { id: "2", title: "Budget Threshold Warning", desc: "Food & Dining reached 85% of monthly allowance", time: "5h ago", unread: true },
+    { id: "3", title: "Net Worth Snapshot Recorded", desc: "Monthly financial historical snapshot saved", time: "1d ago", unread: true },
+    { id: "4", title: "Live FX Rates Synchronized", desc: "GHS / USD exchange rates updated", time: "2d ago", unread: false },
+  ]);
+
+  const handleMarkAllRead = () => {
+    setUnreadCount(0);
+    setNotificationsList((prev) => prev.map((n) => ({ ...n, unread: false })));
+  };
 
   // Accounts for transaction modal
   const { data: accountsData } = useQuery<{ data: Array<{ id: string; name: string; currency: string }> }>({
@@ -325,24 +338,81 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
             aria-label="Toggle theme"
           >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          <button
-            onClick={() => router.push("/notifications")}
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground relative"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-brand-teal" />
-          </button>
+          {/* Notifications Dropdown Bell Button */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotificationsOpen((prev) => !prev)}
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground relative cursor-pointer"
+              aria-label="Notifications"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-brand-teal ring-2 ring-background animate-pulse" />
+              )}
+            </button>
+
+            {/* Notifications Popover Dropdown Panel */}
+            {isNotificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 rounded-2xl border bg-card p-3.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between border-b pb-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-brand-teal" />
+                    <h4 className="font-bold text-xs">Notifications</h4>
+                    {unreadCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-brand-teal/15 text-brand-teal text-[10px] font-bold">
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="text-[10px] text-brand-teal font-semibold hover:underline cursor-pointer"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {notificationsList.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        if (item.unread) {
+                          setUnreadCount((c) => Math.max(0, c - 1));
+                          setNotificationsList((prev) =>
+                            prev.map((n) => (n.id === item.id ? { ...n, unread: false } : n))
+                          );
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl text-xs transition-colors cursor-pointer border ${
+                        item.unread
+                          ? "bg-brand-teal/5 border-brand-teal/20 text-foreground font-medium"
+                          : "bg-background border-transparent text-muted-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-bold text-foreground text-[12px]">{item.title}</p>
+                        <span className="text-[9px] text-muted-foreground shrink-0">{item.time}</span>
+                      </div>
+                      <p className="text-[11px] mt-0.5 leading-snug">{item.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={() => router.push("/settings")}
-            className="p-1.5 rounded-lg hover:bg-muted text-brand-teal"
+            className="p-1.5 rounded-lg hover:bg-muted text-brand-teal cursor-pointer"
             aria-label="Profile"
           >
             <User className="h-4 w-4" />

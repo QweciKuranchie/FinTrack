@@ -102,6 +102,20 @@ export async function POST(request: Request) {
 
     const decimalAmount = new Prisma.Decimal(amount);
 
+    // Validate insufficient balance for transfers and expenses
+    if (type === "TRANSFER" || type === "EXPENSE") {
+      if (decimalAmount.gt(account.currentBalance)) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `Insufficient balance in ${account.name}. ${type === "TRANSFER" ? "Transfer amount" : "Amount"} (${currency} ${amount}) exceeds current account balance (${account.currency} ${Number(account.currentBalance).toFixed(2)})`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Compute balance update in DB transaction
     const result = await prisma.$transaction(async (tx) => {
       const transaction = await tx.transaction.create({

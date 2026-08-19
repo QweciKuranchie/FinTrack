@@ -6,18 +6,13 @@ import {
   CreditCard,
   ArrowUpRight,
   ArrowDownLeft,
-  Bell,
-  Sun,
-  Moon,
   Calendar,
-  CheckCircle2,
   Filter,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import { SpendingCategoryChart, SpendingTrendChart } from "@/components/charts/spending-chart";
 
 interface Account {
@@ -57,11 +52,8 @@ interface TransactionItem {
 type TimeFilterOption = "ALL" | "THIS_MONTH" | "LAST_MONTH" | "LAST_7_DAYS" | "TODAY";
 
 export default function DashboardPage() {
-  const { theme, setTheme } = useTheme();
-
   // Time filter state: default "THIS_MONTH"
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("THIS_MONTH");
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const { data: dashboardData, isLoading } = useQuery<{ data: DashboardData }>({
     queryKey: ["dashboard-summary"],
@@ -145,12 +137,6 @@ export default function DashboardPage() {
     ? Math.min(Math.round((filteredSpent / filteredIncome) * 100), 100)
     : filteredSpent > 0 ? 100 : 0;
 
-  const notificationsList = [
-    { title: "FX Rates Engine Active", desc: "Automated GHS/USD exchange rate cache updated", time: "Just now" },
-    { title: "Subscription Reminders", desc: "Resend email notifications active for upcoming renewals", time: "Today" },
-    { title: "RLS Security Protection", desc: "Supabase Row Level Security active for household data", time: "System" },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Dashboard Top Header Bar */}
@@ -180,70 +166,6 @@ export default function DashboardPage() {
               <option value="ALL">All</option>
             </select>
           </div>
-
-          {/* Dark / Light Mode Toggle Icon */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-lg"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title="Toggle theme mode"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 text-amber-400" />
-            ) : (
-              <Moon className="h-4 w-4 text-slate-700 dark:text-slate-300" />
-            )}
-          </Button>
-
-          {/* Notification Bell Icon & Dropdown */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 rounded-lg relative"
-              onClick={() => setShowNotifications((prev) => !prev)}
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4 text-foreground" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-brand-teal ring-2 ring-background" />
-            </Button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 rounded-xl border bg-card p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center justify-between border-b pb-2 mb-2">
-                  <h4 className="font-bold text-xs">Notifications & System Alerts</h4>
-                  <button
-                    onClick={() => setShowNotifications(false)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {notificationsList.map((item, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-muted/50 text-xs">
-                      <CheckCircle2 className="h-4 w-4 text-brand-teal shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-foreground">{item.title}</p>
-                        <p className="text-muted-foreground text-[11px]">{item.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* User Profile Card */}
-          <Link href="/settings">
-            <Button variant="outline" className="h-9 px-3 gap-2 rounded-lg">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-teal text-white text-[10px] font-bold">
-                U
-              </div>
-              <span className="text-xs font-semibold hidden sm:inline-block">Profile</span>
-            </Button>
-          </Link>
         </div>
       </div>
 

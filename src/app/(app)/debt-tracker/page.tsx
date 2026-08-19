@@ -21,17 +21,16 @@ import {
   Loader2,
 } from "lucide-react";
 
-interface DBLiability {
+interface DebtRecordItem {
   id: string;
-  name: string;
-  counterparty?: string;
+  title: string;
+  counterparty: string;
   isReceivable: boolean;
-  type: string;
-  principal: number;
+  amount: number;
   currentBalance: number;
-  dueDate?: number;
+  dueDate?: string | null;
   currency: string;
-  notes?: string;
+  notes?: string | null;
 }
 
 interface PaginationMeta {
@@ -56,28 +55,28 @@ export default function DebtTrackerPage() {
   const [formDueDate, setFormDueDate] = useState("");
   const [formNotes, setFormNotes] = useState("");
 
-  // Fetch liabilities from database with pagination
-  const { data: liabilitiesResponse, isLoading, isError } = useQuery<{
-    data: DBLiability[];
+  // Fetch debt records from database with pagination
+  const { data: debtRecordsResponse, isLoading, isError } = useQuery<{
+    data: DebtRecordItem[];
     pagination?: PaginationMeta;
   }>({
-    queryKey: ["liabilities", page, limit],
+    queryKey: ["debt-tracker", page, limit],
     queryFn: async () => {
-      const res = await fetch(`/api/liabilities?page=${page}&limit=${limit}`);
-      if (!res.ok) throw new Error("Failed to fetch liabilities");
+      const res = await fetch(`/api/debt-tracker?page=${page}&limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch debt records");
       return res.json();
     },
   });
 
-  const dbLiabilities = liabilitiesResponse?.data ?? [];
-  const pagination = liabilitiesResponse?.pagination ?? { page: 1, limit: 10, totalCount: 0, totalPages: 1 };
+  const dbDebts = debtRecordsResponse?.data ?? [];
+  const pagination = debtRecordsResponse?.pagination ?? { page: 1, limit: 10, totalCount: 0, totalPages: 1 };
 
   // Calculate Real-Time Totals
-  const totalIOwe = dbLiabilities
+  const totalIOwe = dbDebts
     .filter((l) => !l.isReceivable)
     .reduce((sum, l) => sum + Number(l.currentBalance || 0), 0);
 
-  const totalOwedToMe = dbLiabilities
+  const totalOwedToMe = dbDebts
     .filter((l) => l.isReceivable)
     .reduce((sum, l) => sum + Number(l.currentBalance || 0), 0);
 
@@ -86,7 +85,7 @@ export default function DebtTrackerPage() {
   // Create Debt Mutation
   const createMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
-      const res = await fetch("/api/liabilities", {
+      const res = await fetch("/api/debt-tracker", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -95,7 +94,7 @@ export default function DebtTrackerPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
       setIsAddModalOpen(false);
       setFormTitle("");
       setFormPerson("");
@@ -108,7 +107,7 @@ export default function DebtTrackerPage() {
   // Update Debt Payment Mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, currentBalance }: { id: string; currentBalance: number }) => {
-      const res = await fetch(`/api/liabilities/${id}`, {
+      const res = await fetch(`/api/debt-tracker/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentBalance }),
@@ -117,21 +116,21 @@ export default function DebtTrackerPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
     },
   });
 
   // Delete Debt Mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/liabilities/${id}`, {
+      const res = await fetch(`/api/debt-tracker/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete debt record");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
     },
   });
 
@@ -140,10 +139,10 @@ export default function DebtTrackerPage() {
     if (!formTitle || !formAmount) return;
 
     createMutation.mutate({
-      name: formTitle,
+      title: formTitle,
       counterparty: formPerson || "General",
       isReceivable: formType === "OWED_TO_ME",
-      principal: parseFloat(formAmount),
+      amount: parseFloat(formAmount),
       currentBalance: parseFloat(formAmount),
       dueDate: formDueDate || null,
       notes: formNotes || null,
@@ -162,7 +161,7 @@ export default function DebtTrackerPage() {
     }
   };
 
-  const filteredDebts = dbLiabilities.filter((l) =>
+  const filteredDebts = dbDebts.filter((l) =>
     activeTab === "I_OWE" ? !l.isReceivable : l.isReceivable
   );
 
@@ -276,7 +275,7 @@ export default function DebtTrackerPage() {
                 }`}
               >
                 <ArrowUpRight className="h-3.5 w-3.5" />
-                <span>I Owe ({dbLiabilities.filter((l) => !l.isReceivable).length})</span>
+                <span>I Owe ({dbDebts.filter((l) => !l.isReceivable).length})</span>
               </button>
 
               <button
@@ -291,7 +290,7 @@ export default function DebtTrackerPage() {
                 }`}
               >
                 <ArrowDownLeft className="h-3.5 w-3.5" />
-                <span>Owed to Me ({dbLiabilities.filter((l) => l.isReceivable).length})</span>
+                <span>Owed to Me ({dbDebts.filter((l) => l.isReceivable).length})</span>
               </button>
             </div>
           </div>
@@ -315,7 +314,7 @@ export default function DebtTrackerPage() {
             </div>
           ) : (
             filteredDebts.map((item) => {
-              const principalNum = Number(item.principal || 0);
+              const principalNum = Number(item.amount || 0);
               const balanceNum = Number(item.currentBalance || 0);
               const paidNum = Math.max(0, principalNum - balanceNum);
               const progressPct = principalNum > 0 ? Math.min(100, Math.round((paidNum / principalNum) * 100)) : 100;
@@ -325,16 +324,16 @@ export default function DebtTrackerPage() {
                 <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-muted/30 transition-colors">
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-base text-foreground">{item.name}</h4>
+                      <h4 className="font-bold text-base text-foreground">{item.title}</h4>
                       <Badge variant={isSettled ? "secondary" : !item.isReceivable ? "destructive" : "teal"} className="text-[10px]">
-                        {isSettled ? "Settled" : !item.isReceivable ? "Liability" : "Receivable"}
+                        {isSettled ? "Settled" : !item.isReceivable ? "I Owe" : "Owed to Me"}
                       </Badge>
                     </div>
 
                     <p className="text-xs text-muted-foreground">
                       {!item.isReceivable ? "Creditor: " : "Debtor: "}
                       <span className="font-semibold text-foreground">{item.counterparty || "General"}</span>
-                      {item.dueDate && ` • Day of month: ${item.dueDate}`}
+                      {item.dueDate && ` • Due date: ${new Date(item.dueDate).toLocaleDateString()}`}
                     </p>
 
                     {item.notes && <p className="text-xs text-muted-foreground/80 italic">{item.notes}</p>}
@@ -371,7 +370,7 @@ export default function DebtTrackerPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            const amtStr = prompt(`Enter payment amount for ${item.name} (GHS):`, balanceNum.toString());
+                            const amtStr = prompt(`Enter payment amount for ${item.title} (GHS):`, balanceNum.toString());
                             if (amtStr && !isNaN(parseFloat(amtStr))) {
                               handleRecordPayment(item.id, balanceNum, parseFloat(amtStr));
                             }
