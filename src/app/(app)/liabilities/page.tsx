@@ -52,6 +52,8 @@ export default function LiabilitiesPage() {
   const [type, setType] = useState<"LOAN" | "CREDIT_CARD" | "MORTGAGE" | "OTHER">("LOAN");
   const [principal, setPrincipal] = useState("");
   const [interestRate, setInterestRate] = useState("");
+  const [interestPeriod, setInterestPeriod] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "ANNUAL">("ANNUAL");
+  const [lateFee, setLateFee] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [currency, setCurrency] = useState("GHS");
 
@@ -131,6 +133,8 @@ export default function LiabilitiesPage() {
       principal: parseFloat(principal),
       currentBalance: parseFloat(principal),
       interestRate: interestRate ? parseFloat(interestRate) : null,
+      interestPeriod,
+      lateFee: lateFee ? parseFloat(lateFee) : null,
       dueDate: dueDate || null,
       currency,
     });
@@ -405,6 +409,35 @@ export default function LiabilitiesPage() {
                     placeholder="e.g. 18.5"
                     value={interestRate}
                     onChange={(e) => setInterestRate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="interestPeriod">Interest Duration / Frequency</Label>
+                  <select
+                    id="interestPeriod"
+                    value={interestPeriod}
+                    onChange={(e) => setInterestPeriod(e.target.value as "DAILY" | "WEEKLY" | "MONTHLY" | "ANNUAL")}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="ANNUAL">Annual (Per Year)</option>
+                    <option value="MONTHLY">Monthly (Per Month)</option>
+                    <option value="WEEKLY">Weekly (Per Week)</option>
+                    <option value="DAILY">Daily (Per Day)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="lateFee">Late Fee (Optional)</Label>
+                  <Input
+                    id="lateFee"
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 50.00"
+                    value={lateFee}
+                    onChange={(e) => setLateFee(e.target.value)}
                   />
                 </div>
               </div>

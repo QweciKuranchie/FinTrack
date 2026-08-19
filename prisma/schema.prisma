@@ -122,22 +122,31 @@ enum TxnSource {
 }
 
 model Liability {
-  id             String        @id @default(uuid())
+  id             String          @id @default(uuid())
   householdId    String
   name           String
   counterparty   String?
-  isReceivable   Boolean       @default(false)
-  type           LiabilityType @default(OTHER)
+  isReceivable   Boolean         @default(false)
+  type           LiabilityType   @default(OTHER)
   principal      Decimal
   currentBalance Decimal
   interestRate   Decimal?
+  interestPeriod InterestPeriod? @default(ANNUAL)
+  lateFee        Decimal?
   minimumPayment Decimal?
   dueDate        DateTime?
-  currency       String        @default("GHS")
+  currency       String          @default("GHS")
   notes          String?
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime        @default(now())
 
   household Household @relation(fields: [householdId], references: [id])
+}
+
+enum InterestPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ANNUAL
 }
 
 enum LiabilityType {
