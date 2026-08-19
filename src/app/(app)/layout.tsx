@@ -138,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   // User Profile Query
-  const { data: userProfileData } = useQuery<{ data: { name: string; username: string; email: string } }>({
+  const { data: userProfileData } = useQuery<{ data: { name: string; username: string; email: string; workspaceName: string } }>({
     queryKey: ["user-profile"],
     queryFn: async () => {
       const res = await fetch("/api/user/profile");
@@ -203,7 +203,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <div className="flex items-center gap-2.5">
             <User className="h-4 w-4 text-brand-teal" />
-            <span className="truncate max-w-[140px]">Personal Finance</span>
+            <span className="truncate max-w-[140px]">
+              {userProfileData?.data?.workspaceName || "Personal Workspace"}
+            </span>
           </div>
           {isWorkspaceDropdownOpen ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -221,19 +223,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-brand-teal" />
-                <span>Personal Workspace</span>
+                <span className="truncate font-semibold">{userProfileData?.data?.workspaceName || "Personal Workspace"}</span>
               </div>
-              <span className="h-2 w-2 rounded-full bg-brand-teal" />
-            </button>
-
-            <button
-              onClick={() => setIsWorkspaceDropdownOpen(false)}
-              className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-teal-600" />
-                <span>Family Workspace</span>
-              </div>
+              <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0" />
             </button>
 
             <div className="border-t border-border my-1" />
@@ -247,7 +239,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-xs"
             >
               <Plus className="h-3.5 w-3.5 text-brand-teal" />
-              <span>+ Create / Manage Workspaces</span>
+              <span>Manage & Create Workspaces</span>
             </Link>
           </div>
         )}

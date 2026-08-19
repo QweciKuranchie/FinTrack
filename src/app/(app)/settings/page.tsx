@@ -593,13 +593,68 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+          {/* Card 1: Notification Preferences (Delivery Channels) */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Mail className="h-5 w-5 text-brand-teal" /> Notification Preferences & Financial Alerts
+                <Mail className="h-5 w-5 text-brand-teal" /> Notification Preferences (Channels)
               </CardTitle>
               <CardDescription className="text-xs">
-                Configure automatic notification alerts for subscriptions, budget thresholds, and debt due dates
+                Select your preferred notification delivery channels (In-App, Email, Push)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">In-App Notifications</p>
+                    <p className="text-xs text-muted-foreground">Header bell popover badge and interactive dropdown panel</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification delivery channel preferences saved.")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Email Notifications</p>
+                    <p className="text-xs text-muted-foreground">Receive subscription renewal warnings & summary digests via email</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification delivery channel preferences saved.")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Push Notifications</p>
+                    <p className="text-xs text-muted-foreground">Browser and mobile device push notification popups</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification delivery channel preferences saved.")}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Financial Alert Triggers */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600" /> Financial Alert Triggers
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Choose which financial events and thresholds automatically trigger alert notifications
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -607,52 +662,52 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Subscription Renewal Reminders</p>
-                    <p className="text-xs text-muted-foreground">Receive popover alerts 3 days before recurring subscriptions renew</p>
+                    <p className="text-xs text-muted-foreground">Trigger alert 3 days before recurring subscription renewals</p>
                   </div>
                   <input
                     type="checkbox"
                     defaultChecked
                     className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
-                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                    onChange={() => setProfileSuccessMsg("Financial alert trigger preferences saved.")}
                   />
                 </div>
 
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Budget Threshold Warning Alerts</p>
-                    <p className="text-xs text-muted-foreground">Notify when category spending reaches 80% or 100% of allowance</p>
+                    <p className="text-sm font-semibold text-foreground">Budget Threshold Warnings</p>
+                    <p className="text-xs text-muted-foreground">Trigger alert when category spending reaches 80% or 100% of allowance</p>
                   </div>
                   <input
                     type="checkbox"
                     defaultChecked
                     className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
-                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                    onChange={() => setProfileSuccessMsg("Financial alert trigger preferences saved.")}
                   />
                 </div>
 
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Debt & Liability Due Date Notifications</p>
-                    <p className="text-xs text-muted-foreground">Alert on upcoming paydowns or receivable due dates</p>
+                    <p className="text-sm font-semibold text-foreground">Debt & Liability Due Date Alerts</p>
+                    <p className="text-xs text-muted-foreground">Trigger alert on upcoming paydowns or receivable due dates</p>
                   </div>
                   <input
                     type="checkbox"
                     defaultChecked
                     className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
-                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                    onChange={() => setProfileSuccessMsg("Financial alert trigger preferences saved.")}
                   />
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Exchange Rates & FX Update Alerts</p>
-                    <p className="text-xs text-muted-foreground">Notify when automated GHS/USD exchange rate caches refresh</p>
+                    <p className="text-sm font-semibold text-foreground">Exchange Rates & FX Update Notices</p>
+                    <p className="text-xs text-muted-foreground">Trigger notice when automated GHS/USD exchange rate caches refresh</p>
                   </div>
                   <input
                     type="checkbox"
                     defaultChecked
                     className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
-                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                    onChange={() => setProfileSuccessMsg("Financial alert trigger preferences saved.")}
                   />
                 </div>
               </div>
@@ -664,11 +719,53 @@ export default function SettingsPage() {
       {/* TAB 4: Account and Data (Workspaces, Export, & Account Deletion) */}
       {activeTab === "account_data" && (
         <div className="space-y-6">
+          {/* Workspace Management & Creation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Settings2 className="h-5 w-5 text-brand-teal" /> Workspace Management & Creation
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Edit active workspace title or create custom isolated financial workspaces
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3 border-b pb-4">
+                <Label htmlFor="manage-workspace-title">Active Workspace Title</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    id="manage-workspace-title"
+                    placeholder="e.g. Personal Workspace or Business Finance"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    required
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!workspaceName.trim()) return;
+                      updateProfileMutation.mutate({
+                        name: fullName,
+                        username,
+                        workspaceName: workspaceName.trim(),
+                      });
+                    }}
+                    className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer"
+                    disabled={updateProfileMutation.isPending}
+                  >
+                    <Save className="h-4 w-4 mr-1.5" /> Save Workspace Title
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Workspaces & Team Sharing */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="text-base font-bold">Workspace & Team Sharing</CardTitle>
+                <CardTitle className="text-base font-bold">Workspace Team Sharing</CardTitle>
                 <CardDescription className="text-xs">
                   Manage collaborators for active workspace ({workspaceName || householdInfo?.household?.name || "Personal Workspace"})
                 </CardDescription>

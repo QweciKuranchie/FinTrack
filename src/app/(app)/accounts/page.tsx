@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Wallet, Archive, Pencil } from "lucide-react";
+import { Plus, Wallet, Archive, Pencil, Landmark, Smartphone, PiggyBank, Banknote } from "lucide-react";
 
 interface Account {
   id: string;
@@ -145,8 +145,92 @@ export default function AccountsPage() {
 
   const accounts = accountsData?.data ?? [];
 
+  // Group accounts by category
+  const bankAccounts = accounts.filter((a) => a.type === "BANK" || a.type === "CHECKING");
+  const momoAccounts = accounts.filter((a) => a.type === "MOBILE_MONEY" || a.type === "TELECEL_CASH");
+  const savingsAccounts = accounts.filter((a) => a.type === "SAVINGS");
+  const cashAccounts = accounts.filter((a) => a.type === "CASH");
+  const otherAccounts = accounts.filter(
+    (a) => !["BANK", "CHECKING", "MOBILE_MONEY", "TELECEL_CASH", "SAVINGS", "CASH"].includes(a.type)
+  );
+
+  const renderGroup = (
+    title: string,
+    accountList: Account[],
+    icon: React.ReactNode
+  ) => {
+    if (accountList.length === 0) return null;
+    const groupTotal = accountList.reduce((sum, a) => sum + Number(a.currentBalance), 0);
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between border-b pb-2">
+          <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+            {icon}
+            {title}
+            <Badge variant="outline" className="ml-1 text-xs">
+              {accountList.length} {accountList.length === 1 ? "account" : "accounts"}
+            </Badge>
+          </h2>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Subtotal: GHS {groupTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {accountList.map((account) => (
+            <Card key={account.id} className="relative group hover:border-brand-teal/40 transition-colors">
+              <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold">{account.name}</CardTitle>
+                  <CardDescription className="text-xs capitalize mt-0.5">
+                    {account.institution ? `${account.institution} • ` : ""}
+                    {account.type.replace("_", " ").toLowerCase()}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Badge variant="teal">{account.currency}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={() => startEdit(account)}
+                    title="Edit Account"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
+                    onClick={() => {
+                      if (confirm(`Archive ${account.name}?`)) {
+                        archiveAccountMutation.mutate(account.id);
+                      }
+                    }}
+                    title="Archive Account"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <p className="text-2xl font-bold tracking-tight">
+                  {account.currency}{" "}
+                  {Number(account.currentBalance).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
         <div>
@@ -159,7 +243,7 @@ export default function AccountsPage() {
         </div>
 
         {!isAdding && !editingAccount && (
-          <Button onClick={() => setIsAdding(true)} className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-xs">
+          <Button onClick={() => setIsAdding(true)} className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-xs cursor-pointer">
             <Plus className="h-4 w-4 mr-2" /> Add Account
           </Button>
         )}
@@ -168,7 +252,7 @@ export default function AccountsPage() {
       {error && (
         <div className="p-3 bg-destructive/10 border border-destructive/30 text-destructive text-xs rounded-xl flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-destructive hover:underline font-bold">
+          <button onClick={() => setError(null)} className="text-destructive hover:underline font-bold cursor-pointer">
             ×
           </button>
         </div>
@@ -352,7 +436,7 @@ export default function AccountsPage() {
         </Card>
       )}
 
-      {/* Account List Grid */}
+      {/* Account List Grouped Sections */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -368,58 +452,17 @@ export default function AccountsPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Get started by adding your bank account, mobile money wallet, or cash balance.
           </p>
-          <Button onClick={() => setIsAdding(true)} className="bg-brand-teal text-white">
+          <Button onClick={() => setIsAdding(true)} className="bg-brand-teal text-white cursor-pointer">
             Add Your First Account
           </Button>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts.map((account) => (
-            <Card key={account.id} className="relative group hover:border-brand-teal/40 transition-colors">
-              <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold">{account.name}</CardTitle>
-                  <CardDescription className="text-xs capitalize mt-0.5">
-                    {account.institution ? `${account.institution} • ` : ""}
-                    {account.type.replace("_", " ").toLowerCase()}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Badge variant="teal">{account.currency}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                    onClick={() => startEdit(account)}
-                    title="Edit Account"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      if (confirm(`Archive ${account.name}?`)) {
-                        archiveAccountMutation.mutate(account.id);
-                      }
-                    }}
-                    title="Archive Account"
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-2">
-                <p className="text-2xl font-bold tracking-tight">
-                  {account.currency}{" "}
-                  {Number(account.currentBalance).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="space-y-8">
+          {renderGroup("Mobile Money Wallets", momoAccounts, <Smartphone className="h-5 w-5 text-brand-teal" />)}
+          {renderGroup("Bank Accounts", bankAccounts, <Landmark className="h-5 w-5 text-teal-600" />)}
+          {renderGroup("Savings Accounts", savingsAccounts, <PiggyBank className="h-5 w-5 text-amber-600" />)}
+          {renderGroup("Cash Balances", cashAccounts, <Banknote className="h-5 w-5 text-emerald-600" />)}
+          {renderGroup("Other Accounts", otherAccounts, <Wallet className="h-5 w-5 text-slate-600" />)}
         </div>
       )}
     </div>
