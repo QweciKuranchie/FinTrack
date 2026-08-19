@@ -3,9 +3,11 @@ import { z } from "zod";
 export const accountSchema = z.object({
   name: z.string().min(1, "Account name is required"),
   type: z.enum([
+    "BANK",
     "CHECKING",
     "SAVINGS",
     "MOBILE_MONEY",
+    "TELECEL_CASH",
     "CASH",
     "INVESTMENT",
     "OTHER",
