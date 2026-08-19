@@ -26,6 +26,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  ChevronUp,
   X,
   Menu,
   Plus,
@@ -102,6 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
 
@@ -135,10 +137,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const renderSidebarContent = () => (
-    <div className="flex h-full flex-col bg-[#009688] dark:bg-[#064E3B] text-white">
+    <div className="flex h-full flex-col bg-brand-teal dark:bg-[#08332F] text-white">
       {/* Brand Header */}
       <div className="flex h-16 items-center justify-between px-6 pt-2">
-        <span className="font-bold text-2xl tracking-tight text-white">FinTrack</span>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white">
+            <Wallet className="h-4 w-4" />
+          </div>
+          <span className="font-bold text-2xl tracking-tight text-white">FinTrack</span>
+        </div>
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="md:hidden text-white/80 hover:text-white p-1"
@@ -148,15 +155,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      {/* Household / Workspace Selector Pill */}
-      <div className="px-4 py-2">
-        <div className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-3.5 py-2.5 text-sm text-white font-medium shadow-sm transition-colors hover:bg-white/15 cursor-pointer">
+      {/* Household / Workspace Selector Pill & Dropdown */}
+      <div className="px-4 py-2 relative">
+        <button
+          onClick={() => setIsWorkspaceDropdownOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-3.5 py-2.5 text-sm text-white font-medium shadow-sm transition-colors hover:bg-white/15 cursor-pointer"
+        >
           <div className="flex items-center gap-2.5">
             <User className="h-4 w-4 text-teal-100" />
             <span className="truncate max-w-[140px]">Personal Finance</span>
           </div>
-          <ChevronDown className="h-4 w-4 opacity-80 shrink-0" />
-        </div>
+          {isWorkspaceDropdownOpen ? (
+            <ChevronUp className="h-4 w-4 opacity-90 shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 opacity-80 shrink-0" />
+          )}
+        </button>
+
+        {/* Workspace Dropdown Card matching reference screenshot */}
+        {isWorkspaceDropdownOpen && (
+          <div className="mt-2 rounded-xl bg-[#12181B] border border-white/10 p-1.5 shadow-2xl text-sm font-medium text-white space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
+            <button
+              onClick={() => setIsWorkspaceDropdownOpen(false)}
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-white hover:bg-white/10 transition-colors"
+            >
+              <User className="h-4 w-4 text-white" />
+              <span>Personal Finance</span>
+            </button>
+
+            <div className="border-t border-white/10 my-1" />
+
+            <Link
+              href="/settings"
+              onClick={() => {
+                setIsWorkspaceDropdownOpen(false);
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <Settings className="h-4 w-4 text-white/80" />
+              <span>Manage Workspaces</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Nav Sections Scroll Area */}
@@ -246,7 +287,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header Bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[#009688] text-white flex items-center justify-between px-4 z-40 shadow-md">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-brand-teal dark:bg-[#08332F] text-white flex items-center justify-between px-4 z-40 shadow-md">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
           className="p-1.5 rounded-lg hover:bg-white/10 text-white"
@@ -285,7 +326,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile Floating Add Button */}
       <button
         onClick={() => setIsQuickAddOpen(true)}
-        className="fixed right-5 bottom-20 md:bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#009688] text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
+        className="fixed right-5 bottom-20 md:bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-teal text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
         aria-label="Quick add transaction"
       >
         <Plus className="h-6 w-6" />
@@ -308,7 +349,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               href={item.href}
               className={cn(
                 "flex flex-col items-center justify-center w-full py-1 text-xs font-medium transition-colors",
-                isActive ? "text-[#009688] font-bold" : "text-muted-foreground"
+                isActive ? "text-brand-teal font-bold" : "text-muted-foreground"
               )}
             >
               <Icon className="h-5 w-5 mb-0.5" />
