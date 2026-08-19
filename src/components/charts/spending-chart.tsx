@@ -10,18 +10,30 @@ import {
   CartesianGrid,
   LineChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 interface CategoryData {
   name: string;
   amount: number;
-  color: string;
+  color?: string;
 }
 
 interface MonthlyData {
   month: string;
   amount: number;
 }
+
+interface IncomeExpenseComparison {
+  month: string;
+  income: number;
+  expenses: number;
+}
+
+const COLORS = ["#0F766E", "#F59E0B", "#3B82F6", "#EC4899", "#8B5CF6", "#10B981", "#6366F1", "#EF4444"];
 
 export function SpendingCategoryChart({ categoryData }: { categoryData: CategoryData[] }) {
   if (!categoryData || categoryData.length === 0) {
@@ -72,6 +84,76 @@ export function SpendingTrendChart({ monthlyData }: { monthlyData: MonthlyData[]
           />
           <Line type="monotone" dataKey="amount" stroke="#F59E0B" strokeWidth={2} dot={{ r: 4 }} />
         </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function IncomeVsExpenseChart({ data }: { data: IncomeExpenseComparison[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex h-64 items-center justify-center text-xs text-muted-foreground">
+        No income vs expense data recorded yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <Tooltip
+            formatter={(value: unknown, name: unknown) => [
+              `GHS ${Number(value ?? 0).toFixed(2)}`,
+              name === "income" ? "Income" : "Expenses",
+            ]}
+            contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
+          <Bar dataKey="income" name="Income" fill="#10B981" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function CategoryPieChart({ data }: { data: CategoryData[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex h-64 items-center justify-center text-xs text-muted-foreground">
+        No expense category distribution available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={55}
+            outerRadius={90}
+            paddingAngle={4}
+            dataKey="amount"
+            nameKey="name"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value: unknown) => [`GHS ${Number(value ?? 0).toFixed(2)}`, "Amount"]}
+            contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend wrapperStyle={{ fontSize: "11px" }} />
+        </PieChart>
       </ResponsiveContainer>
     </div>
   );

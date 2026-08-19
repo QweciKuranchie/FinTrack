@@ -127,10 +127,18 @@ export default function DashboardPage() {
     return true;
   });
 
-  // Calculate filtered spending total
+  // Calculate filtered spending and income totals
   const filteredSpent = filteredTxns
     .filter((t) => t.type === "EXPENSE")
     .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const filteredIncome = filteredTxns
+    .filter((t) => t.type === "INCOME")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const expenseRatio = filteredIncome > 0
+    ? Math.min(Math.round((filteredSpent / filteredIncome) * 100), 100)
+    : filteredSpent > 0 ? 100 : 0;
 
   const notificationsList = [
     { title: "FX Rates Engine Active", desc: "Automated GHS/USD exchange rate cache updated", time: "Just now" },
@@ -288,6 +296,150 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 2x2 Metric Sparkline & Progress Grid matching reference screenshot */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Card 1: BALANCE */}
+        <Card className="bg-card/90 border border-border p-5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
+                BALANCE
+              </p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
+                GHS {(summary?.totalAccountsBalance ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </h3>
+              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                ↑ +2.4%
+              </span>
+            </div>
+            {/* Red/Teal Gradient Wave Sparkline */}
+            <div className="w-24 h-12">
+              <svg viewBox="0 0 100 40" className="w-full h-full">
+                <defs>
+                  <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#EF4444" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="#EF4444" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 0 30 Q 25 10, 50 25 T 100 5 L 100 40 L 0 40 Z"
+                  fill="url(#balanceGrad)"
+                />
+                <path
+                  d="M 0 30 Q 25 10, 50 25 T 100 5"
+                  fill="none"
+                  stroke="#EF4444"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+        </Card>
+
+        {/* Card 2: SAVINGS TRACKER */}
+        <Card className="bg-card/90 border border-border p-5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
+                SAVINGS TRACKER
+              </p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
+                GHS {(summary?.totalAssets ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </h3>
+              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                ↑ +5.8%
+              </span>
+            </div>
+            {/* Vertical Pill Bar Progress Graphic */}
+            <div className="w-12 h-14 flex items-end justify-center">
+              <div className="w-3.5 h-12 bg-muted/60 rounded-full overflow-hidden flex items-end p-0.5">
+                <div className="w-full h-3/4 bg-teal-500 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Card 3: INCOME */}
+        <Card className="bg-card/90 border border-border p-5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
+                INCOME
+              </p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
+                GHS {filteredIncome.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </h3>
+              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                ↑ +12.0%
+              </span>
+            </div>
+            {/* Green Smooth Mini Sparkline Curve */}
+            <div className="w-24 h-12">
+              <svg viewBox="0 0 100 40" className="w-full h-full">
+                <defs>
+                  <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 0 35 Q 30 30, 60 20 T 100 10 L 100 40 L 0 40 Z"
+                  fill="url(#incomeGrad)"
+                />
+                <path
+                  d="M 0 35 Q 30 30, 60 20 T 100 10"
+                  fill="none"
+                  stroke="#10B981"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+        </Card>
+
+        {/* Card 4: EXPENSES */}
+        <Card className="bg-card/90 border border-border p-5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
+                EXPENSES
+              </p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
+                GHS {filteredSpent.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </h3>
+              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                ↓ -4.2%
+              </span>
+            </div>
+            {/* Circular Donut Radial Progress Ring */}
+            <div className="relative flex items-center justify-center w-14 h-14">
+              <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3.5"
+                  className="text-muted/40"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#0D9488"
+                  strokeWidth="3.5"
+                  strokeDasharray={`${expenseRatio}, 100`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute text-[11px] font-bold text-foreground">
+                {expenseRatio}%
+              </span>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {/* Filtered Spending Strip */}
       <Card>

@@ -54,8 +54,8 @@ const sidebarSections: NavSection[] = [
     title: "MAIN MENU",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Compass },
-      { name: "Statistics", href: "/dashboard?tab=analytics", icon: TrendingUp },
-      { name: "Add Expense", action: "ADD_EXPENSE", icon: CreditCard },
+      { name: "Statistics", href: "/statistics", icon: TrendingUp },
+      { name: "Add Transaction", action: "ADD_EXPENSE", icon: CreditCard },
       { name: "Budget", href: "/budgets", icon: Wallet },
     ],
   },
