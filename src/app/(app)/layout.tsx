@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import {
   Compass,
@@ -33,11 +33,16 @@ import {
   Sun,
   Moon,
   Bell,
+  Wrench,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { QuickTransactionModal } from "@/components/transactions/quick-transaction-modal";
 import { CsvImportModal } from "@/components/transactions/csv-import-modal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface NavItem {
   name: string;
@@ -67,6 +72,9 @@ const sidebarSections: NavSection[] = [
       { name: "Budget", href: "/budgets", icon: Wallet },
       { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
       { name: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
+      { name: "Replacement & Repairs", href: "/repairs", icon: Wrench },
+      { name: "Needs", href: "/needs", icon: CheckSquare },
+      { name: "Promise", href: "/promise", icon: Handshake },
     ],
   },
   {
@@ -89,7 +97,7 @@ const sidebarSections: NavSection[] = [
   {
     title: "INTEGRATIONS",
     items: [
-      { name: "Momo & Bank Sync", href: "/accounts", icon: Landmark },
+      { name: "Momo & Bank Sync", href: "/sync", icon: Landmark },
       { name: "CSV Import", action: "CSV_IMPORT", icon: FileSpreadsheet },
     ],
   },
@@ -102,6 +110,7 @@ const sidebarSections: NavSection[] = [
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -136,6 +145,79 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleMarkAllRead = () => {
     setReadIds(realNotifications.map((n) => n.id));
   };
+
+  interface WorkspaceItem {
+    id: string;
+    name: string;
+    role: string;
+    memberCount: number;
+    isCurrentActive: boolean;
+  }
+
+  const [isNewWorkspaceModalOpen, setIsNewWorkspaceModalOpen] = useState(false);
+  const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState("");
+
+  // Workspaces Query
+  const { data: workspacesResponse } = useQuery<{ data: WorkspaceItem[] }>({
+    queryKey: ["workspaces"],
+    queryFn: async () => {
+      const res = await fetch("/api/workspaces");
+      if (!res.ok) throw new Error("Failed to fetch workspaces");
+      return res.json();
+    },
+  });
+
+  const workspacesList = workspacesResponse?.data ?? [];
+
+  // Switch Workspace Mutation
+  const switchWorkspaceMutation = useMutation({
+    mutationFn: async (workspaceId: string) => {
+      const res = await fetch("/api/workspaces/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      if (!res.ok) throw new Error("Failed to switch workspace");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      setIsWorkspaceDropdownOpen(false);
+    },
+  });
+
+  // Create Workspace Mutation
+  const createWorkspaceMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("Failed to create workspace");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      setIsNewWorkspaceModalOpen(false);
+      setNewWorkspaceNameInput("");
+      setIsWorkspaceDropdownOpen(false);
+    },
+  });
 
   // User Profile Query
   const { data: userProfileData } = useQuery<{ data: { name: string; username: string; email: string; workspaceName: string } }>({
@@ -217,30 +299,62 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Workspace Dropdown Card */}
         {isWorkspaceDropdownOpen && (
           <div className="mt-2 rounded-xl bg-popover border border-border p-1.5 shadow-xl text-sm font-medium text-popover-foreground space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
-            <button
-              onClick={() => setIsWorkspaceDropdownOpen(false)}
-              className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors text-foreground"
-            >
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-brand-teal" />
-                <span className="truncate font-semibold">{userProfileData?.data?.workspaceName || "Personal Workspace"}</span>
-              </div>
-              <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0" />
-            </button>
+            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Your Workspaces ({workspacesList.length || 1})
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-0.5">
+              {workspacesList.length === 0 ? (
+                <button
+                  onClick={() => setIsWorkspaceDropdownOpen(false)}
+                  className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-xs bg-brand-teal/10 font-bold text-brand-teal"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <User className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{userProfileData?.data?.workspaceName || "Personal Workspace"}</span>
+                  </div>
+                  <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0" />
+                </button>
+              ) : (
+                workspacesList.map((ws) => (
+                  <button
+                    key={ws.id}
+                    onClick={() => {
+                      if (!ws.isCurrentActive) {
+                        switchWorkspaceMutation.mutate(ws.id);
+                      } else {
+                        setIsWorkspaceDropdownOpen(false);
+                      }
+                    }}
+                    disabled={switchWorkspaceMutation.isPending}
+                    className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                      ws.isCurrentActive
+                        ? "bg-brand-teal/10 font-bold text-brand-teal"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate pr-2">
+                      <User className="h-3.5 w-3.5 shrink-0 text-brand-teal" />
+                      <span className="truncate">{ws.name}</span>
+                    </div>
+                    {ws.isCurrentActive && <span className="h-2 w-2 rounded-full bg-brand-teal shrink-0" />}
+                  </button>
+                ))
+              )}
+            </div>
 
             <div className="border-t border-border my-1" />
 
-            <Link
-              href="/settings"
+            <button
               onClick={() => {
                 setIsWorkspaceDropdownOpen(false);
-                setIsMobileMenuOpen(false);
+                setIsNewWorkspaceModalOpen(true);
               }}
-              className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-xs"
+              className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-brand-teal hover:bg-brand-teal/10 transition-colors text-xs font-bold cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5 text-brand-teal" />
-              <span>Manage & Create Workspaces</span>
-            </Link>
+              <Plus className="h-3.5 w-3.5" />
+              <span>+ Create New Workspace</span>
+            </button>
           </div>
         )}
       </div>
@@ -475,6 +589,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onSuccess={() => router.refresh()}
         accounts={accounts}
       />
+
+      {/* Create New Workspace Modal */}
+      {isNewWorkspaceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setIsNewWorkspaceModalOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-card border p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold mb-1">Create New Workspace</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Add a new isolated workspace to track separate personal or business finances
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newWorkspaceNameInput.trim()) return;
+                createWorkspaceMutation.mutate(newWorkspaceNameInput.trim());
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="new-ws-name">Workspace Name</Label>
+                <Input
+                  id="new-ws-name"
+                  placeholder="e.g. Side Hustle, Family Household"
+                  value={newWorkspaceNameInput}
+                  onChange={(e) => setNewWorkspaceNameInput(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setIsNewWorkspaceModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-brand-teal text-white hover:bg-brand-teal/90"
+                  disabled={createWorkspaceMutation.isPending}
+                >
+                  {createWorkspaceMutation.isPending ? "Creating..." : "Create Workspace"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

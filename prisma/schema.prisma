@@ -45,13 +45,14 @@ enum Role {
 }
 
 model UserProfile {
-  id        String   @id // Supabase auth.users.id
-  email     String   @unique
-  name      String?
-  username  String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id // Supabase auth.users.id
+  email             String   @unique
+  name              String?
+  username          String?
+  avatarUrl         String?
+  activeHouseholdId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Account {

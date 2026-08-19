@@ -29,38 +29,75 @@ export async function requireAuthUser() {
 }
 
 export async function getOrCreateHouseholdForUser(userId: string, email?: string) {
-  // Check if member already belongs to a household
+  // 1. Check if user has an activeHouseholdId set in UserProfile
+  const profile = await prisma.userProfile.findUnique({
+    where: { id: userId },
+  });
+
+  if (profile?.activeHouseholdId) {
+    const activeMember = await prisma.householdMember.findFirst({
+      where: { userId, householdId: profile.activeHouseholdId },
+      include: { household: true },
+    });
+    if (activeMember) {
+      return activeMember.household;
+    }
+  }
+
+  // 2. Otherwise find first membership
   const member = await prisma.householdMember.findFirst({
     where: { userId },
     include: { household: true },
   });
 
-  if (!member) {
-    // Create new household and add user as OWNER
-    const householdName = email ? `${email.split("@")[0]}'s Household` : "My Household";
-    const household = await prisma.household.create({
-      data: {
-        name: householdName,
-        createdBy: userId,
-        members: {
-          create: {
-            userId,
-            role: "OWNER",
-          },
-        },
+  if (member) {
+    await prisma.userProfile.upsert({
+      where: { id: userId },
+      create: {
+        id: userId,
+        email: email || "",
+        activeHouseholdId: member.householdId,
       },
-      include: {
-        members: true,
+      update: {
+        activeHouseholdId: member.householdId,
       },
     });
-
-    // Seed default categories for this household
-    await seedDefaultCategories(household.id);
-
-    return household;
+    return member.household;
   }
 
-  return member.household;
+  // 3. Create initial workspace if user has no households
+  const householdName = email ? `${email.split("@")[0]}'s Workspace` : "Personal Workspace";
+  const household = await prisma.household.create({
+    data: {
+      name: householdName,
+      createdBy: userId,
+      members: {
+        create: {
+          userId,
+          role: "OWNER",
+        },
+      },
+    },
+    include: {
+      members: true,
+    },
+  });
+
+  await seedDefaultCategories(household.id);
+
+  await prisma.userProfile.upsert({
+    where: { id: userId },
+    create: {
+      id: userId,
+      email: email || "",
+      activeHouseholdId: household.id,
+    },
+    update: {
+      activeHouseholdId: household.id,
+    },
+  });
+
+  return household;
 }
 
 export async function seedDefaultCategories(householdId: string) {

@@ -123,9 +123,68 @@ export default function SettingsPage() {
     },
   });
 
+  // Workspaces Query
+  const { data: workspacesData } = useQuery<{
+    data: Array<{ id: string; name: string; role: string; memberCount: number; isCurrentActive: boolean }>;
+  }>({
+    queryKey: ["workspaces"],
+    queryFn: async () => {
+      const res = await fetch("/api/workspaces");
+      if (!res.ok) throw new Error("Failed to fetch workspaces");
+      return res.json();
+    },
+  });
+
+  const [newWsInput, setNewWsInput] = useState("");
+
+  const createWsMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to create workspace");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setNewWsInput("");
+      setProfileSuccessMsg("New workspace created successfully.");
+    },
+  });
+
+  const switchWsMutation = useMutation({
+    mutationFn: async (workspaceId: string) => {
+      const res = await fetch("/api/workspaces/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to switch workspace");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      setProfileSuccessMsg("Switched active workspace.");
+    },
+  });
+
   const categories = categoriesData?.data ?? [];
   const householdInfo = householdData?.data;
   const members = householdInfo?.members ?? [];
+  const allWorkspaces = workspacesData?.data ?? [];
 
   // Profile Save Mutation
   const updateProfileMutation = useMutation({
@@ -730,8 +789,9 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Form 1: Edit Active Workspace Title */}
               <div className="space-y-3 border-b pb-4">
-                <Label htmlFor="manage-workspace-title">Active Workspace Title</Label>
+                <Label htmlFor="manage-workspace-title">Edit Active Workspace Title</Label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     id="manage-workspace-title"
@@ -756,6 +816,68 @@ export default function SettingsPage() {
                   >
                     <Save className="h-4 w-4 mr-1.5" /> Save Workspace Title
                   </Button>
+                </div>
+              </div>
+
+              {/* Form 2: Create New Workspace */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newWsInput.trim()) return;
+                  createWsMutation.mutate(newWsInput.trim());
+                }}
+                className="space-y-3 border-b pb-4"
+              >
+                <Label htmlFor="create-new-ws-input">Create Brand New Workspace</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    id="create-new-ws-input"
+                    placeholder="e.g. Side Project, Family Budget"
+                    value={newWsInput}
+                    onChange={(e) => setNewWsInput(e.target.value)}
+                    required
+                    className="flex-1"
+                  />
+                  <Button
+                    type="submit"
+                    className="bg-brand-teal text-white hover:bg-brand-teal/90 cursor-pointer"
+                    disabled={createWsMutation.isPending}
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" /> Create Workspace
+                  </Button>
+                </div>
+              </form>
+
+              {/* List 3: All Workspaces Owned & Joined */}
+              <div className="space-y-2 pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your Workspaces</h4>
+                <div className="divide-y border rounded-xl overflow-hidden">
+                  {allWorkspaces.map((ws) => (
+                    <div key={ws.id} className="p-3.5 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-foreground">{ws.name}</p>
+                          {ws.isCurrentActive && <Badge variant="teal" className="text-[10px]">Active</Badge>}
+                          <Badge variant="outline" className="text-[10px] uppercase">{ws.role}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {ws.memberCount} {ws.memberCount === 1 ? "member" : "members"}
+                        </p>
+                      </div>
+
+                      {!ws.isCurrentActive && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => switchWsMutation.mutate(ws.id)}
+                          disabled={switchWsMutation.isPending}
+                          className="h-8 text-xs gap-1 border-brand-teal/40 text-brand-teal hover:bg-brand-teal/10 cursor-pointer"
+                        >
+                          Switch To Workspace
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
