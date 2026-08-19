@@ -264,14 +264,6 @@ export default function SettingsPage() {
           <Users className="h-4 w-4" /> Household & Sharing
         </button>
         <button
-          onClick={() => setActiveTab("fx")}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-            activeTab === "fx" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
-          }`}
-        >
-          <Globe className="h-4 w-4" /> FX & Currencies
-        </button>
-        <button
           onClick={() => setActiveTab("export")}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
             activeTab === "export" ? "bg-brand-teal text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
