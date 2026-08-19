@@ -10,7 +10,7 @@ interface QuickTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  accounts: Array<{ id: string; name: string; currency: string }>;
+  accounts: Array<{ id: string; name: string; currency: string; currentBalance?: number }>;
 }
 
 export function QuickTransactionModal({
@@ -53,6 +53,18 @@ export function QuickTransactionModal({
     if (!accountId) {
       setError("Please select the source account");
       return;
+    }
+
+    const selectedAccount = accounts.find((a) => a.id === accountId);
+
+    // Validate insufficient balance
+    if ((type === "TRANSFER" || type === "EXPENSE") && selectedAccount && selectedAccount.currentBalance !== undefined) {
+      if (numericAmount > selectedAccount.currentBalance) {
+        setError(
+          `Insufficient balance: ${type === "TRANSFER" ? "Transfer amount" : "Amount"} (${selectedAccount.currency} ${numericAmount.toFixed(2)}) exceeds available balance in ${selectedAccount.name} (${selectedAccount.currency} ${Number(selectedAccount.currentBalance).toFixed(2)})`
+        );
+        return;
+      }
     }
 
     if (type === "TRANSFER") {
