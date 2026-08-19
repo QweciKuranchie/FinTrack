@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet } from "lucide-react";
+import { Wallet, CheckCircle2 } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,11 +17,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfoMsg(null);
 
     const validation = signupSchema.safeParse({ email, password, confirmPassword });
     if (!validation.success) {
@@ -31,7 +33,7 @@ export default function SignupPage() {
 
     setLoading(true);
     const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -42,9 +44,31 @@ export default function SignupPage() {
       return;
     }
 
-    // Redirect to dashboard (household auto-created on first auth API call or navigation)
-    router.push("/dashboard");
-    router.refresh();
+    // If session returned immediately (email confirmation disabled)
+    if (data.session) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    // Try auto-login if user created
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInData.session) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    if (signInError) {
+      setLoading(false);
+      setInfoMsg(
+        "Account created successfully! Please check your email inbox to confirm your account, or disable 'Confirm email' in your Supabase Auth Dashboard settings for instant login."
+      );
+    }
   };
 
   return (
@@ -64,6 +88,12 @@ export default function SignupPage() {
             {error && (
               <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive dark:bg-destructive/30">
                 {error}
+              </div>
+            )}
+            {infoMsg && (
+              <div className="rounded-md bg-teal-50 border border-teal-200 dark:bg-teal-950/40 dark:border-teal-800 p-3 text-xs text-teal-800 dark:text-teal-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-teal-600 mt-0.5 shrink-0" />
+                <span>{infoMsg}</span>
               </div>
             )}
             <div className="space-y-2">
