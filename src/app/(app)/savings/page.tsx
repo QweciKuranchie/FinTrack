@@ -13,6 +13,7 @@ import {
   Trash2,
   Target,
   ArrowUpRight,
+  ArrowDownLeft,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -309,9 +310,29 @@ export default function SavingsPage() {
                         }
                       }}
                       disabled={depositMutation.isPending}
-                      className="h-8 text-xs gap-1"
+                      className="h-8 text-xs gap-1 border-teal-500/40 text-teal-700 dark:text-teal-300 hover:bg-teal-500/10 cursor-pointer"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 text-teal-600" /> + Deposit
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const withdrawStr = prompt(`Withdraw from ${goal.name} (GHS):`, "50");
+                        if (withdrawStr && !isNaN(parseFloat(withdrawStr))) {
+                          const withdrawAmt = parseFloat(withdrawStr);
+                          if (withdrawAmt > current) {
+                            alert("Withdrawal amount cannot exceed current saved balance.");
+                            return;
+                          }
+                          depositMutation.mutate({ id: goal.id, newAmount: Math.max(0, current - withdrawAmt) });
+                        }
+                      }}
+                      disabled={depositMutation.isPending}
+                      className="h-8 text-xs gap-1 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                    >
+                      <ArrowDownLeft className="h-3.5 w-3.5 text-amber-600" /> - Withdraw
                     </Button>
 
                     <Button

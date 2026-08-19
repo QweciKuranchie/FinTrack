@@ -21,6 +21,8 @@ export const transactionSchema = z.object({
   accountId: z.string().min(1, "Account is required"),
   categoryId: z.string().optional().nullable(),
   amount: z.number().positive("Amount must be greater than 0"),
+  taxRate: z.number().nonnegative().optional().nullable(),
+  taxAmount: z.number().nonnegative().optional().nullable(),
   currency: z.string().default("GHS"),
   type: z.enum(["INCOME", "EXPENSE", "TRANSFER"]),
   description: z.string().optional().nullable(),
