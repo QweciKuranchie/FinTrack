@@ -60,7 +60,7 @@ const sidebarSections: NavSection[] = [
     title: "FINANCIAL CATEGORY",
     items: [
       { name: "Budget", href: "/budgets", icon: Wallet },
-      { name: "Debt Manager", href: "/net-worth", icon: HandCoins },
+      { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
       { name: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
     ],
   },
