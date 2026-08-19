@@ -14,12 +14,27 @@ export async function GET() {
 
     const household = await getOrCreateHouseholdForUser(user.id, user.email);
 
+    let profile = await prisma.userProfile.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!profile) {
+      profile = await prisma.userProfile.create({
+        data: {
+          id: user.id,
+          email: user.email || "",
+          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+          username: user.user_metadata?.username || user.email?.split("@")[0] || "username",
+        },
+      });
+    }
+
     return NextResponse.json({
       data: {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        username: user.user_metadata?.username || user.email?.split("@")[0] || "username",
+        id: profile.id,
+        email: profile.email,
+        name: profile.name || user.email?.split("@")[0] || "User",
+        username: profile.username || user.email?.split("@")[0] || "username",
         workspaceName: household.name,
         workspaceCreatedAt: household.createdAt,
       },
@@ -52,12 +67,26 @@ export async function PUT(request: Request) {
       });
     }
 
+    const updatedProfile = await prisma.userProfile.upsert({
+      where: { id: user.id },
+      create: {
+        id: user.id,
+        email: user.email || "",
+        name: name?.trim() || null,
+        username: username?.trim() || null,
+      },
+      update: {
+        name: name?.trim() || null,
+        username: username?.trim() || null,
+      },
+    });
+
     return NextResponse.json({
       data: {
-        id: user.id,
-        email: user.email,
-        name: name || user.email?.split("@")[0],
-        username: username || user.email?.split("@")[0],
+        id: updatedProfile.id,
+        email: updatedProfile.email,
+        name: updatedProfile.name || user.email?.split("@")[0],
+        username: updatedProfile.username || user.email?.split("@")[0],
         workspaceName: workspaceName || household.name,
         workspaceCreatedAt: household.createdAt,
       },

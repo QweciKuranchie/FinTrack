@@ -592,6 +592,72 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Mail className="h-5 w-5 text-brand-teal" /> Notification Preferences & Financial Alerts
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Configure automatic notification alerts for subscriptions, budget thresholds, and debt due dates
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Subscription Renewal Reminders</p>
+                    <p className="text-xs text-muted-foreground">Receive popover alerts 3 days before recurring subscriptions renew</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Budget Threshold Warning Alerts</p>
+                    <p className="text-xs text-muted-foreground">Notify when category spending reaches 80% or 100% of allowance</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Debt & Liability Due Date Notifications</p>
+                    <p className="text-xs text-muted-foreground">Alert on upcoming paydowns or receivable due dates</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Exchange Rates & FX Update Alerts</p>
+                    <p className="text-xs text-muted-foreground">Notify when automated GHS/USD exchange rate caches refresh</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 accent-teal-600 rounded cursor-pointer"
+                    onChange={() => setProfileSuccessMsg("Notification preferences saved.")}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

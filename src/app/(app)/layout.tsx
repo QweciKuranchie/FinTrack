@@ -111,18 +111,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(3);
-  const [notificationsList, setNotificationsList] = useState([
-    { id: "1", title: "Subscription Due Soon", desc: "Netflix Premium renewal due in 3 days ($15.99)", time: "2h ago", unread: true },
-    { id: "2", title: "Budget Threshold Warning", desc: "Food & Dining reached 85% of monthly allowance", time: "5h ago", unread: true },
-    { id: "3", title: "Net Worth Snapshot Recorded", desc: "Monthly financial historical snapshot saved", time: "1d ago", unread: true },
-    { id: "4", title: "Live FX Rates Synchronized", desc: "GHS / USD exchange rates updated", time: "2d ago", unread: false },
-  ]);
+  // Real Notifications Query
+  const { data: notificationsResponse } = useQuery<{
+    data: Array<{ id: string; title: string; desc: string; time: string; type: string; unread: boolean }>;
+    unreadCount: number;
+  }>({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      return res.json();
+    },
+  });
+
+  const [readIds, setReadIds] = useState<string[]>([]);
+
+  const realNotifications = notificationsResponse?.data ?? [];
+  const notificationsList = realNotifications.map((n) => ({
+    ...n,
+    unread: readIds.includes(n.id) ? false : n.unread,
+  }));
+  const unreadCount = notificationsList.filter((n) => n.unread).length;
 
   const handleMarkAllRead = () => {
-    setUnreadCount(0);
-    setNotificationsList((prev) => prev.map((n) => ({ ...n, unread: false })));
+    setReadIds(realNotifications.map((n) => n.id));
   };
+
+  // User Profile Query
+  const { data: userProfileData } = useQuery<{ data: { name: string; username: string; email: string } }>({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const res = await fetch("/api/user/profile");
+      if (!res.ok) throw new Error("Failed to fetch user profile");
+      return res.json();
+    },
+  });
 
   // Accounts for transaction modal
   const { data: accountsData } = useQuery<{ data: Array<{ id: string; name: string; currency: string }> }>({
@@ -386,10 +409,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       key={item.id}
                       onClick={() => {
                         if (item.unread) {
-                          setUnreadCount((c) => Math.max(0, c - 1));
-                          setNotificationsList((prev) =>
-                            prev.map((n) => (n.id === item.id ? { ...n, unread: false } : n))
-                          );
+                          setReadIds((prev) => [...prev, item.id]);
                         }
                       }}
                       className={`p-2.5 rounded-xl text-xs transition-colors cursor-pointer border ${
@@ -412,10 +432,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <button
             onClick={() => router.push("/settings")}
-            className="p-1.5 rounded-lg hover:bg-muted text-brand-teal cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-teal/15 text-brand-teal font-bold text-xs hover:bg-brand-teal/25 transition-colors cursor-pointer border border-brand-teal/30"
             aria-label="Profile"
+            title={userProfileData?.data?.name ? `${userProfileData.data.name} (@${userProfileData.data.username})` : "Profile"}
           >
-            <User className="h-4 w-4" />
+            {userProfileData?.data?.name?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
           </button>
         </div>
       </header>

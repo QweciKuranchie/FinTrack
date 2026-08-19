@@ -80,6 +80,8 @@ export async function PATCH(
         name: json.name ?? existingAccount.name,
         type: json.type ?? existingAccount.type,
         institution: json.institution ?? existingAccount.institution,
+        currency: json.currency ?? existingAccount.currency,
+        currentBalance: json.currentBalance !== undefined ? json.currentBalance : existingAccount.currentBalance,
         isArchived: json.isArchived ?? existingAccount.isArchived,
       },
     });

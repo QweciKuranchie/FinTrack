@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Pencil,
 } from "lucide-react";
 
 interface DebtRecordItem {
@@ -44,6 +45,7 @@ export default function DebtTrackerPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"I_OWE" | "OWED_TO_ME">("I_OWE");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingDebt, setEditingDebt] = useState<DebtRecordItem | null>(null);
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -52,6 +54,7 @@ export default function DebtTrackerPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formPerson, setFormPerson] = useState("");
   const [formAmount, setFormAmount] = useState("");
+  const [formCurrentBalance, setFormCurrentBalance] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
   const [formNotes, setFormNotes] = useState("");
 
@@ -117,6 +120,25 @@ export default function DebtTrackerPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+  });
+
+  // Update Full Debt Item Mutation
+  const updateDebtMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Record<string, unknown> }) => {
+      const res = await fetch(`/api/debt-tracker/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update debt record");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setEditingDebt(null);
     },
   });
 
@@ -131,6 +153,7 @@ export default function DebtTrackerPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debt-tracker"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
 
@@ -148,6 +171,35 @@ export default function DebtTrackerPage() {
       notes: formNotes || null,
       currency: "GHS",
     });
+  };
+
+  const handleUpdateDebt = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDebt || !formTitle || !formAmount) return;
+
+    updateDebtMutation.mutate({
+      id: editingDebt.id,
+      payload: {
+        title: formTitle,
+        counterparty: formPerson || "General",
+        isReceivable: formType === "OWED_TO_ME",
+        amount: parseFloat(formAmount),
+        currentBalance: parseFloat(formCurrentBalance || formAmount),
+        dueDate: formDueDate || null,
+        notes: formNotes || null,
+      },
+    });
+  };
+
+  const startEdit = (item: DebtRecordItem) => {
+    setEditingDebt(item);
+    setFormType(item.isReceivable ? "OWED_TO_ME" : "I_OWE");
+    setFormTitle(item.title);
+    setFormPerson(item.counterparty);
+    setFormAmount(item.amount.toString());
+    setFormCurrentBalance(item.currentBalance.toString());
+    setFormDueDate(item.dueDate ? item.dueDate.split("T")[0] : "");
+    setFormNotes(item.notes || "");
   };
 
   const handleRecordPayment = (id: string, currentBalance: number, paymentAmt: number) => {
@@ -384,8 +436,17 @@ export default function DebtTrackerPage() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        onClick={() => startEdit(item)}
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Edit debt record"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         onClick={() => handleDeleteDebt(item.id)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer"
                         disabled={deleteMutation.isPending}
                         title="Delete record"
                       >
@@ -531,6 +592,131 @@ export default function DebtTrackerPage() {
                   disabled={createMutation.isPending}
                 >
                   {createMutation.isPending ? "Saving..." : "Save Debt Record"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Debt Modal */}
+      {editingDebt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setEditingDebt(null)} />
+          <div className="relative w-full max-w-lg rounded-2xl bg-card border p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold mb-1">Edit Debt Record</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Update personal debt or receivable entry details
+            </p>
+
+            <form onSubmit={handleUpdateDebt} className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 border p-1 rounded-xl bg-muted/40">
+                <button
+                  type="button"
+                  onClick={() => setFormType("I_OWE")}
+                  className={`py-2 text-xs font-bold rounded-lg transition-colors ${
+                    formType === "I_OWE"
+                      ? "bg-destructive text-destructive-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  I Owe (Personal Debt)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormType("OWED_TO_ME")}
+                  className={`py-2 text-xs font-bold rounded-lg transition-colors ${
+                    formType === "OWED_TO_ME"
+                      ? "bg-brand-teal text-white shadow-xs"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  Owed to Me (Receivable)
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-formTitle">Title / Purpose</Label>
+                <Input
+                  id="edit-formTitle"
+                  placeholder="e.g. Loan for Laptop or Rent Share"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-formPerson">
+                  {formType === "I_OWE" ? "Creditor (Person/Party You Owe)" : "Debtor (Person Who Owes You)"}
+                </Label>
+                <Input
+                  id="edit-formPerson"
+                  placeholder="e.g. John Doe, Sarah"
+                  value={formPerson}
+                  onChange={(e) => setFormPerson(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-formAmount">Original Principal Amount (GHS)</Label>
+                  <Input
+                    id="edit-formAmount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-formCurrentBalance">Current Balance (GHS)</Label>
+                  <Input
+                    id="edit-formCurrentBalance"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formCurrentBalance}
+                    onChange={(e) => setFormCurrentBalance(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-formDueDate">Due Date (Optional)</Label>
+                <Input
+                  id="edit-formDueDate"
+                  type="date"
+                  value={formDueDate}
+                  onChange={(e) => setFormDueDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-formNotes">Notes (Optional)</Label>
+                <Input
+                  id="edit-formNotes"
+                  placeholder="Installment terms or notes"
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditingDebt(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-brand-teal text-white hover:bg-brand-teal/90"
+                  disabled={updateDebtMutation.isPending}
+                >
+                  {updateDebtMutation.isPending ? "Updating..." : "Update Debt Record"}
                 </Button>
               </div>
             </form>

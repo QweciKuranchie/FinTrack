@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Pencil,
 } from "lucide-react";
 
 interface DBLiability {
@@ -26,11 +27,12 @@ interface DBLiability {
   type: string;
   principal: number;
   currentBalance: number;
-  interestRate?: number;
-  minimumPayment?: number;
-  dueDate?: number;
+  interestRate?: number | null;
+  interestPeriod?: "DAILY" | "WEEKLY" | "MONTHLY" | "ANNUAL" | null;
+  lateFee?: number | null;
+  dueDate?: string | null;
   currency: string;
-  notes?: string;
+  notes?: string | null;
 }
 
 interface PaginationMeta {
@@ -42,15 +44,17 @@ interface PaginationMeta {
 
 export default function LiabilitiesPage() {
   const queryClient = useQueryClient();
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingLiability, setEditingLiability] = useState<DBLiability | null>(null);
   const [page, setPage] = useState(1);
   const limit = 10;
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Form state
+  // Form State
   const [name, setName] = useState("");
   const [counterparty, setCounterparty] = useState("");
   const [type, setType] = useState<"LOAN" | "CREDIT_CARD" | "MORTGAGE" | "OTHER">("LOAN");
   const [principal, setPrincipal] = useState("");
+  const [currentBalance, setCurrentBalance] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [interestPeriod, setInterestPeriod] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "ANNUAL">("ANNUAL");
   const [lateFee, setLateFee] = useState("");
@@ -107,6 +111,24 @@ export default function LiabilitiesPage() {
     },
   });
 
+  // Update Liability Mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Record<string, unknown> }) => {
+      const res = await fetch(`/api/liabilities/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update liability");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setEditingLiability(null);
+    },
+  });
+
   // Delete Liability Mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -118,6 +140,7 @@ export default function LiabilitiesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
 
@@ -131,13 +154,48 @@ export default function LiabilitiesPage() {
       isReceivable: false,
       type,
       principal: parseFloat(principal),
-      currentBalance: parseFloat(principal),
+      currentBalance: parseFloat(currentBalance || principal),
       interestRate: interestRate ? parseFloat(interestRate) : null,
       interestPeriod,
       lateFee: lateFee ? parseFloat(lateFee) : null,
       dueDate: dueDate || null,
       currency,
     });
+  };
+
+  const handleUpdateLiability = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLiability || !name || !principal) return;
+
+    updateMutation.mutate({
+      id: editingLiability.id,
+      payload: {
+        name,
+        counterparty,
+        type,
+        principal: parseFloat(principal),
+        currentBalance: parseFloat(currentBalance || principal),
+        interestRate: interestRate ? parseFloat(interestRate) : null,
+        interestPeriod,
+        lateFee: lateFee ? parseFloat(lateFee) : null,
+        dueDate: dueDate || null,
+        currency,
+      },
+    });
+  };
+
+  const startEdit = (item: DBLiability) => {
+    setEditingLiability(item);
+    setName(item.name);
+    setCounterparty(item.counterparty || "");
+    setType(item.type as "LOAN" | "CREDIT_CARD" | "MORTGAGE" | "OTHER");
+    setPrincipal(item.principal.toString());
+    setCurrentBalance(item.currentBalance.toString());
+    setInterestRate(item.interestRate ? item.interestRate.toString() : "");
+    setInterestPeriod(item.interestPeriod || "ANNUAL");
+    setLateFee(item.lateFee ? item.lateFee.toString() : "");
+    setDueDate(item.dueDate ? item.dueDate.split("T")[0] : "");
+    setCurrency(item.currency || "GHS");
   };
 
   return (
@@ -276,13 +334,23 @@ export default function LiabilitiesPage() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    onClick={() => startEdit(item)}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+                    title="Edit Liability"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={() => {
                       if (confirm(`Delete liability ${item.name}?`)) {
                         deleteMutation.mutate(item.id);
                       }
                     }}
                     disabled={deleteMutation.isPending}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -462,6 +530,162 @@ export default function LiabilitiesPage() {
                   disabled={createMutation.isPending}
                 >
                   {createMutation.isPending ? "Saving..." : "Save Liability"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Liability Modal */}
+      {editingLiability && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setEditingLiability(null)} />
+          <div className="relative w-full max-w-lg rounded-2xl bg-card border p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold mb-1">Edit Liability Record</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Update loan parameters, balance, interest, or late fee
+            </p>
+
+            <form onSubmit={handleUpdateLiability} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-liability-name">Liability Title / Loan Name</Label>
+                <Input
+                  id="edit-liability-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-liability-counterparty">Lender / Institution Name</Label>
+                <Input
+                  id="edit-liability-counterparty"
+                  value={counterparty}
+                  onChange={(e) => setCounterparty(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-type">Liability Type</Label>
+                  <select
+                    id="edit-liability-type"
+                    value={type}
+                    onChange={(e) => setType(e.target.value as "LOAN" | "CREDIT_CARD" | "MORTGAGE" | "OTHER")}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="LOAN">Bank Loan</option>
+                    <option value="CREDIT_CARD">Credit Card Balance</option>
+                    <option value="MORTGAGE">Mortgage Loan</option>
+                    <option value="OTHER">Other Debt</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-currency">Currency</Label>
+                  <select
+                    id="edit-liability-currency"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="GHS">GHS — Ghana Cedi (₵)</option>
+                    <option value="USD">USD — US Dollar ($)</option>
+                    <option value="EUR">EUR — Euro (€)</option>
+                    <option value="GBP">GBP — British Pound (£)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-principal">Original Principal Amount</Label>
+                  <Input
+                    id="edit-liability-principal"
+                    type="number"
+                    step="0.01"
+                    value={principal}
+                    onChange={(e) => setPrincipal(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-balance">Current Outstanding Balance</Label>
+                  <Input
+                    id="edit-liability-balance"
+                    type="number"
+                    step="0.01"
+                    value={currentBalance}
+                    onChange={(e) => setCurrentBalance(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-interest">Interest Rate % (Optional)</Label>
+                  <Input
+                    id="edit-liability-interest"
+                    type="number"
+                    step="0.1"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-period">Interest Duration / Frequency</Label>
+                  <select
+                    id="edit-liability-period"
+                    value={interestPeriod}
+                    onChange={(e) => setInterestPeriod(e.target.value as "DAILY" | "WEEKLY" | "MONTHLY" | "ANNUAL")}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="ANNUAL">Annual (Per Year)</option>
+                    <option value="MONTHLY">Monthly (Per Month)</option>
+                    <option value="WEEKLY">Weekly (Per Week)</option>
+                    <option value="DAILY">Daily (Per Day)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-latefee">Late Fee (Optional)</Label>
+                  <Input
+                    id="edit-liability-latefee"
+                    type="number"
+                    step="0.01"
+                    value={lateFee}
+                    onChange={(e) => setLateFee(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-liability-duedate">Due Date (Optional)</Label>
+                  <Input
+                    id="edit-liability-duedate"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditingLiability(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-brand-teal text-white hover:bg-brand-teal/90"
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? "Updating..." : "Update Liability"}
                 </Button>
               </div>
             </form>

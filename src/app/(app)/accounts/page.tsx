@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Wallet, Archive } from "lucide-react";
+import { Plus, Wallet, Archive, Pencil } from "lucide-react";
 
 interface Account {
   id: string;
@@ -30,6 +30,9 @@ interface NewAccountPayload {
 export default function AccountsPage() {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+
+  // Form State for Add / Edit
   const [name, setName] = useState("");
   const [type, setType] = useState("BANK");
   const [currency, setCurrency] = useState("GHS");
@@ -66,9 +69,27 @@ export default function AccountsPage() {
       setInstitution("");
       setError(null);
     },
-    onError: (err: Error) => {
-      setError(err.message);
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Record<string, unknown> }) => {
+      const res = await fetch(`/api/accounts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to update account");
+      return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setEditingAccount(null);
+      setError(null);
+    },
+    onError: (err: Error) => setError(err.message),
   });
 
   const archiveAccountMutation = useMutation({
@@ -85,7 +106,7 @@ export default function AccountsPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     createAccountMutation.mutate({
@@ -97,86 +118,119 @@ export default function AccountsPage() {
     });
   };
 
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setError(null);
+    updateAccountMutation.mutate({
+      id: editingAccount.id,
+      payload: {
+        name,
+        type,
+        currency,
+        currentBalance: parseFloat(openingBalance) || 0,
+        institution: institution || null,
+      },
+    });
+  };
+
+  const startEdit = (acc: Account) => {
+    setEditingAccount(acc);
+    setName(acc.name);
+    setType(acc.type);
+    setCurrency(acc.currency);
+    setOpeningBalance(acc.currentBalance.toString());
+    setInstitution(acc.institution || "");
+  };
+
   const accounts = accountsData?.data ?? [];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header Bar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Accounts</h1>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
+            <Wallet className="h-7 w-7 text-brand-teal" /> Accounts & Wallets
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Manage your bank accounts, mobile money wallets, investments, and cash
+            Manage bank accounts, mobile money wallets, savings, and cash holdings
           </p>
         </div>
-        <Button
-          onClick={() => setIsAdding(!isAdding)}
-          className="bg-brand-teal text-white hover:bg-brand-teal/90"
-        >
-          <Plus className="h-4 w-4 mr-2" /> {isAdding ? "Cancel" : "Add Account"}
-        </Button>
+
+        {!isAdding && !editingAccount && (
+          <Button onClick={() => setIsAdding(true)} className="bg-brand-teal text-white hover:bg-brand-teal/90 shadow-xs">
+            <Plus className="h-4 w-4 mr-2" /> Add Account
+          </Button>
+        )}
       </div>
 
-      {/* Add Account Form Drawer/Card */}
+      {error && (
+        <div className="p-3 bg-destructive/10 border border-destructive/30 text-destructive text-xs rounded-xl flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-destructive hover:underline font-bold">
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Add Account Modal Form */}
       {isAdding && (
-        <Card className="border-brand-teal/30">
+        <Card className="border-brand-teal/30 bg-teal-50/20 dark:bg-teal-950/10">
           <CardHeader>
-            <CardTitle>Create New Account</CardTitle>
-            <CardDescription>Enter details to track a new balance</CardDescription>
+            <CardTitle className="text-lg font-bold">Create New Account</CardTitle>
+            <CardDescription className="text-xs">Add a new bank account or digital wallet to track</CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleCreateSubmit}>
             <CardContent className="space-y-4">
-              {error && (
-                <div className="rounded-md bg-destructive/15 p-3 text-xs text-destructive">
-                  {error}
-                </div>
-              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="account-name">Account Name</Label>
+                  <Label htmlFor="name">Account Name</Label>
                   <Input
-                    id="account-name"
-                    placeholder="e.g. MTN MoMo, Ecobank Savings"
+                    id="name"
+                    placeholder="e.g. Ecobank Checking, MTN MoMo"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="account-type">Account Type</Label>
+                  <Label htmlFor="type">Account Type</Label>
                   <select
-                    id="account-type"
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    id="type"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                     value={type}
                     onChange={(e) => setType(e.target.value)}
                   >
                     <option value="BANK">Bank Account</option>
                     <option value="SAVINGS">Savings Account</option>
-                    <option value="MOBILE_MONEY">MTN Mobile Money (MoMo)</option>
-                    <option value="TELECEL_CASH">Telecel Cash</option>
-                    <option value="CASH">Cash</option>
-                    <option value="OTHER">Other</option>
+                    <option value="MOBILE_MONEY">MTN MoMo Wallet</option>
+                    <option value="TELECEL_CASH">Telecel Cash Wallet</option>
+                    <option value="CASH">Physical Cash</option>
+                    <option value="OTHER">Other Financial Account</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="account-currency">Currency</Label>
+                  <Label htmlFor="currency">Currency</Label>
                   <select
-                    id="account-currency"
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    id="currency"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
                   >
-                    <option value="GHS">GHS (Ghana Cedi)</option>
-                    <option value="USD">USD (US Dollar)</option>
-                    <option value="EUR">EUR (Euro)</option>
-                    <option value="GBP">GBP (British Pound)</option>
+                    <option value="GHS">GHS — Ghana Cedi (₵)</option>
+                    <option value="USD">USD — US Dollar ($)</option>
+                    <option value="EUR">EUR — Euro (€)</option>
+                    <option value="GBP">GBP — British Pound (£)</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="opening-balance">Opening Balance</Label>
+                  <Label htmlFor="openingBalance">Opening Balance</Label>
                   <Input
-                    id="opening-balance"
+                    id="openingBalance"
                     type="number"
                     step="0.01"
+                    placeholder="0.00"
                     value={openingBalance}
                     onChange={(e) => setOpeningBalance(e.target.value)}
                     required
@@ -210,6 +264,94 @@ export default function AccountsPage() {
         </Card>
       )}
 
+      {/* Edit Account Modal Form */}
+      {editingAccount && (
+        <Card className="border-brand-teal/30 bg-teal-50/20 dark:bg-teal-950/10">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Edit Account: {editingAccount.name}</CardTitle>
+            <CardDescription className="text-xs">Update account details or adjust balance</CardDescription>
+          </CardHeader>
+          <form onSubmit={handleEditSubmit}>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-name">Account Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-type">Account Type</Label>
+                  <select
+                    id="edit-type"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    value={type}
+                    onChange={(e) => setType(e.target.value)}
+                  >
+                    <option value="BANK">Bank Account</option>
+                    <option value="SAVINGS">Savings Account</option>
+                    <option value="MOBILE_MONEY">MTN MoMo Wallet</option>
+                    <option value="TELECEL_CASH">Telecel Cash Wallet</option>
+                    <option value="CASH">Physical Cash</option>
+                    <option value="OTHER">Other Financial Account</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-currency">Currency</Label>
+                  <select
+                    id="edit-currency"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                  >
+                    <option value="GHS">GHS — Ghana Cedi (₵)</option>
+                    <option value="USD">USD — US Dollar ($)</option>
+                    <option value="EUR">EUR — Euro (€)</option>
+                    <option value="GBP">GBP — British Pound (£)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-balance">Current Balance</Label>
+                  <Input
+                    id="edit-balance"
+                    type="number"
+                    step="0.01"
+                    value={openingBalance}
+                    onChange={(e) => setOpeningBalance(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="edit-institution">Institution / Provider (Optional)</Label>
+                  <Input
+                    id="edit-institution"
+                    placeholder="e.g. Ecobank, MTN, Fidelity"
+                    value={institution}
+                    onChange={(e) => setInstitution(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditingAccount(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-brand-teal text-white hover:bg-brand-teal/90"
+                  disabled={updateAccountMutation.isPending}
+                >
+                  {updateAccountMutation.isPending ? "Updating..." : "Update Account"}
+                </Button>
+              </div>
+            </CardContent>
+          </form>
+        </Card>
+      )}
+
       {/* Account List Grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -233,7 +375,7 @@ export default function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((account) => (
-            <Card key={account.id} className="relative group">
+            <Card key={account.id} className="relative group hover:border-brand-teal/40 transition-colors">
               <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold">{account.name}</CardTitle>
@@ -244,6 +386,15 @@ export default function AccountsPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <Badge variant="teal">{account.currency}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                    onClick={() => startEdit(account)}
+                    title="Edit Account"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
