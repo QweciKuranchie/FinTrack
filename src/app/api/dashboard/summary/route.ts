@@ -29,11 +29,12 @@ export async function GET() {
       totalAccountsBalanceGhs = totalAccountsBalanceGhs.plus(ghsValue);
     });
 
-    // 2. Fetch Assets & Liabilities
-    const [assets, liabilities, savingsGoals] = await Promise.all([
+    // 2. Fetch Assets, Liabilities, Savings Goals & Debt Tracker Records
+    const [assets, liabilities, savingsGoals, debtRecords] = await Promise.all([
       prisma.asset.findMany({ where: { householdId: household.id } }),
       prisma.liability.findMany({ where: { householdId: household.id } }),
       prisma.savingsGoal.findMany({ where: { householdId: household.id } }),
+      prisma.debtRecord.findMany({ where: { householdId: household.id } }),
     ]);
 
     let totalAssetsGhs = new Decimal(0);
@@ -46,6 +47,19 @@ export async function GET() {
       totalLiabilitiesGhs = totalLiabilitiesGhs.plus(convertCurrency(liab.currentBalance.toString(), liab.currency, "GHS", fxRates));
     });
 
+    let totalOwedToMeGhs = new Decimal(0);
+    let totalIOweGhs = new Decimal(0);
+    debtRecords.forEach((d) => {
+      const val = convertCurrency(d.currentBalance.toString(), d.currency, "GHS", fxRates);
+      if (d.isReceivable) {
+        totalOwedToMeGhs = totalOwedToMeGhs.plus(val);
+      } else {
+        totalIOweGhs = totalIOweGhs.plus(val);
+      }
+    });
+
+    const netDebtPositionGhs = totalOwedToMeGhs.minus(totalIOweGhs);
+
     let totalSavedGhs = new Decimal(0);
     let totalTargetGhs = new Decimal(0);
     savingsGoals.forEach((g) => {
@@ -53,7 +67,11 @@ export async function GET() {
       totalTargetGhs = totalTargetGhs.plus(convertCurrency(g.targetAmount.toString(), g.currency, "GHS", fxRates));
     });
 
-    const netWorthGhs = totalAccountsBalanceGhs.plus(totalAssetsGhs).minus(totalLiabilitiesGhs);
+    // Net Worth = Accounts + Assets + Net Debt Position (Receivables - Personal IOUs) - Liabilities
+    const netWorthGhs = totalAccountsBalanceGhs
+      .plus(totalAssetsGhs)
+      .plus(netDebtPositionGhs)
+      .minus(totalLiabilitiesGhs);
     const savingsProgressPct = totalTargetGhs.gt(0) ? Math.min(100, Math.round(totalSavedGhs.div(totalTargetGhs).times(100).toNumber())) : 0;
 
     // 3. Transactions Calculations (Current Month vs Last Month)
@@ -123,6 +141,9 @@ export async function GET() {
         totalAccountsBalance: totalAccountsBalanceGhs.toNumber(),
         totalAssets: totalAssetsGhs.toNumber(),
         totalLiabilities: totalLiabilitiesGhs.toNumber(),
+        netDebtPosition: netDebtPositionGhs.toNumber(),
+        totalOwedToMe: totalOwedToMeGhs.toNumber(),
+        totalIOwe: totalIOweGhs.toNumber(),
         thisMonthIncome: thisMonthIncome.toNumber(),
         thisMonthSpend: thisMonthExpense.toNumber(),
         totalSavings: totalSavedGhs.toNumber(),

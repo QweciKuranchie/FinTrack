@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Scale, ArrowUpRight, ArrowDownRight, LineChart, PiggyBank, Landmark, ShieldAlert } from "lucide-react";
+import { Scale, ArrowUpRight, ArrowDownRight, LineChart, Landmark, ShieldAlert } from "lucide-react";
 import { NetWorthTrendChart } from "@/components/charts/net-worth-chart";
 import Link from "next/link";
 
@@ -13,6 +13,9 @@ interface DashboardSummaryData {
   totalAccountsBalance: number;
   totalAssets: number;
   totalLiabilities: number;
+  netDebtPosition?: number;
+  totalOwedToMe?: number;
+  totalIOwe?: number;
 }
 
 export default function NetWorthPage() {
@@ -46,6 +49,8 @@ export default function NetWorthPage() {
     { date: "May", netWorth: summary?.netWorth ?? 0 },
   ];
 
+  const netDebtVal = summary?.netDebtPosition ?? 0;
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -55,7 +60,7 @@ export default function NetWorthPage() {
             <Scale className="h-7 w-7 text-brand-teal" /> Net Worth Tracker
           </h1>
           <p className="text-sm text-muted-foreground">
-            Comprehensive snapshot of your total net financial position (Cash + Assets − Liabilities)
+            Net Worth Formula: Assets + Net Debt Position (Receivables − IOUs) − Total Liabilities
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -64,14 +69,14 @@ export default function NetWorthPage() {
               <LineChart className="h-4 w-4 text-teal-600" /> Manage Assets
             </Button>
           </Link>
-          <Link href="/liabilities">
+          <Link href="/debt-tracker">
             <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-destructive" /> Manage Liabilities
+              <Landmark className="h-4 w-4 text-brand-teal" /> Debt Tracker
             </Button>
           </Link>
-          <Link href="/savings">
+          <Link href="/liabilities">
             <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5">
-              <PiggyBank className="h-4 w-4 text-brand-teal" /> Savings Goals
+              <ShieldAlert className="h-4 w-4 text-destructive" /> Liabilities
             </Button>
           </Link>
         </div>
@@ -85,7 +90,7 @@ export default function NetWorthPage() {
               Total Net Worth Position
             </CardDescription>
             <Badge variant="outline" className="text-xs font-semibold">
-              Live Balance
+              Calculated Real-Time
             </Badge>
           </div>
           <CardTitle className="text-3xl font-extrabold tracking-tight md:text-5xl text-foreground">
@@ -100,7 +105,7 @@ export default function NetWorthPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-4">
             <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                 <Landmark className="h-5 w-5" />
@@ -118,9 +123,21 @@ export default function NetWorthPage() {
                 <ArrowUpRight className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-semibold">Physical & Non-Liquid Assets</p>
+                <p className="text-xs text-muted-foreground font-semibold">Assets Value</p>
                 <p className="text-base font-extrabold text-teal-600 dark:text-teal-400">
                   +GHS {(summary?.totalAssets ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${netDebtVal >= 0 ? "bg-teal-500/10 text-teal-600" : "bg-red-500/10 text-destructive"}`}>
+                <Scale className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold">Net Debt Position</p>
+                <p className={`text-base font-extrabold ${netDebtVal >= 0 ? "text-teal-600 dark:text-teal-400" : "text-destructive"}`}>
+                  {netDebtVal >= 0 ? "+" : ""}GHS {netDebtVal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -130,7 +147,7 @@ export default function NetWorthPage() {
                 <ArrowDownRight className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-semibold font-semibold">Total Debts & Liabilities</p>
+                <p className="text-xs text-muted-foreground font-semibold font-semibold">Institutional Liabilities</p>
                 <p className="text-base font-extrabold text-destructive">
                   -GHS {(summary?.totalLiabilities ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
