@@ -8,6 +8,7 @@ import {
   Compass,
   TrendingUp,
   CreditCard,
+  ArrowDownRight,
   Wallet,
   HandCoins,
   RefreshCw,
@@ -60,6 +61,7 @@ const sidebarSections: NavSection[] = [
     title: "FINANCIAL CATEGORY",
     items: [
       { name: "Add Transaction", action: "ADD_EXPENSE", icon: CreditCard },
+      { name: "Expenses", href: "/expenses", icon: ArrowDownRight },
       { name: "Budget", href: "/budgets", icon: Wallet },
       { name: "Debt Tracker", href: "/debt-tracker", icon: HandCoins },
       { name: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
@@ -72,7 +74,7 @@ const sidebarSections: NavSection[] = [
       { name: "Liabilities", href: "/liabilities", icon: CreditCard },
       { name: "Net Worth", href: "/net-worth", icon: Scale },
       { name: "Savings", href: "/savings", icon: PiggyBank },
-      { name: "FX & Currencies", href: "/settings?tab=fx", icon: RefreshCw },
+      { name: "FX & Currencies", href: "/fx", icon: RefreshCw },
     ],
   },
   {
