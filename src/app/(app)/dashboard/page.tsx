@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   CreditCard,
@@ -8,7 +8,6 @@ import {
   ArrowDownLeft,
   Calendar,
   Filter,
-  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,16 +46,14 @@ interface TransactionItem {
   currency: string;
   date: string;
   account?: { name: string };
-  category?: { name: string };
+  category?: { name: string; color?: string };
 }
 
 type TimeFilterOption = "ALL" | "THIS_MONTH" | "LAST_MONTH" | "LAST_7_DAYS" | "TODAY";
-type SortOption = "NEWEST" | "OLDEST" | "AMOUNT_HIGH" | "AMOUNT_LOW";
 
 export default function DashboardPage() {
-  // Time filter & sorting state
+  // Time filter state
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>("THIS_MONTH");
-  const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
 
   const { data: dashboardData, isLoading } = useQuery<{ data: DashboardData }>({
     queryKey: ["dashboard-summary"],
@@ -87,75 +84,101 @@ export default function DashboardPage() {
 
   const summary = dashboardData?.data;
   const analytics = spendingAnalytics?.data;
-  const allTxns: TransactionItem[] = recentTxns?.data ?? [];
 
   // Filter transactions according to selected time range
-  const filteredTxns = allTxns.filter((txn) => {
-    const txnDate = new Date(txn.date);
+  const filteredTxns = useMemo(() => {
+    const allTxns: TransactionItem[] = recentTxns?.data ?? [];
     const now = new Date();
 
-    if (timeFilter === "TODAY") {
-      return (
-        txnDate.getDate() === now.getDate() &&
-        txnDate.getMonth() === now.getMonth() &&
-        txnDate.getFullYear() === now.getFullYear()
-      );
-    }
+    return allTxns.filter((txn) => {
+      const txnDate = new Date(txn.date);
 
-    if (timeFilter === "LAST_7_DAYS") {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      return txnDate >= sevenDaysAgo;
-    }
+      if (timeFilter === "TODAY") {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return txnDate >= startOfToday;
+      }
 
-    if (timeFilter === "THIS_MONTH") {
-      return (
-        txnDate.getMonth() === now.getMonth() &&
-        txnDate.getFullYear() === now.getFullYear()
-      );
-    }
+      if (timeFilter === "LAST_7_DAYS") {
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0);
+        return txnDate >= sevenDaysAgo;
+      }
 
-    if (timeFilter === "LAST_MONTH") {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return (
-        txnDate.getMonth() === lastMonth.getMonth() &&
-        txnDate.getFullYear() === lastMonth.getFullYear()
-      );
-    }
+      if (timeFilter === "THIS_MONTH") {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return txnDate >= startOfMonth;
+      }
 
-    // "ALL"
-    return true;
-  });
+      if (timeFilter === "LAST_MONTH") {
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        return txnDate >= startOfLastMonth && txnDate <= endOfLastMonth;
+      }
 
-  // Sort transactions according to selected sorting option
-  const sortedTxns = [...filteredTxns].sort((a, b) => {
-    if (sortBy === "NEWEST") {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    }
-    if (sortBy === "OLDEST") {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    }
-    if (sortBy === "AMOUNT_HIGH") {
-      return Number(b.amount) - Number(a.amount);
-    }
-    if (sortBy === "AMOUNT_LOW") {
-      return Number(a.amount) - Number(b.amount);
-    }
-    return 0;
-  });
+      // "ALL"
+    });
+  }, [recentTxns?.data, timeFilter]);
+
+  // Sort filtered transactions by date descending (Newest first)
+  const sortedTxns = useMemo(() => {
+    return [...filteredTxns].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [filteredTxns]);
 
   // Calculate filtered spending and income totals
-  const filteredSpent = filteredTxns
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const filteredSpent = useMemo(() => {
+    return filteredTxns
+      .filter((t) => t.type === "EXPENSE")
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }, [filteredTxns]);
 
-  const filteredIncome = filteredTxns
-    .filter((t) => t.type === "INCOME")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const filteredIncome = useMemo(() => {
+    return filteredTxns
+      .filter((t) => t.type === "INCOME")
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }, [filteredTxns]);
 
-  const expenseRatio = filteredIncome > 0
-    ? Math.min(Math.round((filteredSpent / filteredIncome) * 100), 100)
-    : filteredSpent > 0 ? 100 : 0;
+  // Dynamic Category Breakdown based on filtered transactions
+  const filteredCategoryData = useMemo(() => {
+    const expenseTxns = filteredTxns.filter((t) => t.type === "EXPENSE");
+    if (expenseTxns.length === 0 && analytics?.byCategory) {
+      return analytics.byCategory;
+    }
+
+    const map: Record<string, { name: string; amount: number; color: string }> = {};
+    expenseTxns.forEach((txn) => {
+      const catName = txn.category?.name || "Uncategorized";
+      const catColor = txn.category?.color || "#0F766E";
+      if (!map[catName]) {
+        map[catName] = { name: catName, amount: 0, color: catColor };
+      }
+      map[catName].amount += Number(txn.amount);
+    });
+
+    return Object.values(map);
+  }, [filteredTxns, analytics?.byCategory]);
+
+  const expenseRatio = useMemo(() => {
+    if (filteredIncome > 0) {
+      return Math.min(Math.round((filteredSpent / filteredIncome) * 100), 100);
+    }
+    return filteredSpent > 0 ? 100 : 0;
+  }, [filteredSpent, filteredIncome]);
+
+  const filterLabel = useMemo(() => {
+    switch (timeFilter) {
+      case "THIS_MONTH":
+        return "This Month";
+      case "TODAY":
+        return "Today";
+      case "LAST_7_DAYS":
+        return "Last 7 Days";
+      case "LAST_MONTH":
+        return "Last Month";
+      default:
+        return "All Time";
+    }
+  }, [timeFilter]);
 
   return (
     <div className="space-y-6">
@@ -168,9 +191,8 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Right Header Action Controls: Time Range & Sorting Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Dashboard Date Filter Dropdown */}
+        {/* Right Header Action Control: Time Range Dropdown */}
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-xs">
             <Filter className="h-3.5 w-3.5 text-brand-teal" />
             <select
@@ -186,22 +208,6 @@ export default function DashboardPage() {
               <option value="ALL">All</option>
             </select>
           </div>
-
-          {/* Dashboard Transaction Sorting Dropdown */}
-          <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-xs">
-            <ArrowUpDown className="h-3.5 w-3.5 text-brand-teal" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="bg-transparent text-xs font-semibold cursor-pointer outline-hidden focus:ring-0"
-              aria-label="Dashboard transaction sorting"
-            >
-              <option value="NEWEST">Newest Date</option>
-              <option value="OLDEST">Oldest Date</option>
-              <option value="AMOUNT_HIGH">Highest Amount</option>
-              <option value="AMOUNT_LOW">Lowest Amount</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -214,15 +220,7 @@ export default function DashboardPage() {
             </CardDescription>
             <Badge variant="outline" className="text-[10px]">
               <Calendar className="h-3 w-3 mr-1" />
-              {timeFilter === "THIS_MONTH"
-                ? "This Month"
-                : timeFilter === "TODAY"
-                ? "Today"
-                : timeFilter === "LAST_7_DAYS"
-                ? "Last 7 Days"
-                : timeFilter === "LAST_MONTH"
-                ? "Last Month"
-                : "All Time"}
+              {filterLabel}
             </Badge>
           </div>
           <CardTitle className="text-3xl font-extrabold tracking-tight md:text-4xl">
@@ -260,7 +258,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* 2x2 Metric Sparkline & Progress Grid matching reference screenshot */}
+      {/* 2x2 Metric Sparkline & Progress Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Card 1: BALANCE */}
         <Card className="bg-card/90 border border-border p-5 rounded-2xl shadow-xs">
@@ -273,10 +271,10 @@ export default function DashboardPage() {
                 GHS {(summary?.totalAccountsBalance ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </h3>
               <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                ↑ +2.4%
+                Total Available Funds
               </span>
             </div>
-            {/* Red/Teal Gradient Wave Sparkline */}
+            {/* Sparkline Graphic */}
             <div className="w-24 h-12">
               <svg viewBox="0 0 100 40" className="w-full h-full">
                 <defs>
@@ -332,13 +330,13 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
-                INCOME
+                INCOME ({filterLabel})
               </p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
-                GHS {(summary?.thisMonthIncome ?? filteredIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                GHS {filteredIncome.toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </h3>
-              <span className={`inline-flex items-center text-xs font-semibold mt-1 ${(summary?.incomeChangePct ?? 0) >= 0 ? "text-teal-600 dark:text-teal-400" : "text-destructive"}`}>
-                {(summary?.incomeChangePct ?? 0) >= 0 ? "↑ +" : "↓ "}{summary?.incomeChangePct ?? 0}% vs Last Month
+              <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                Total Received ({filterLabel})
               </span>
             </div>
             {/* Green Smooth Mini Sparkline Curve */}
@@ -371,13 +369,13 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
-                EXPENSES
+                EXPENSES ({filterLabel})
               </p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
                 GHS {filteredSpent.toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </h3>
               <span className="inline-flex items-center text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                ↓ -4.2%
+                Total Spent ({filterLabel})
               </span>
             </div>
             {/* Circular Donut Radial Progress Ring */}
@@ -416,17 +414,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">
-                Spent (
-                {timeFilter === "THIS_MONTH"
-                  ? "This Month"
-                  : timeFilter === "TODAY"
-                  ? "Today"
-                  : timeFilter === "LAST_7_DAYS"
-                  ? "Last 7 Days"
-                  : timeFilter === "LAST_MONTH"
-                  ? "Last Month"
-                  : "All Time"}
-                )
+                Spent ({filterLabel})
               </p>
               <p className="text-lg font-bold text-foreground">
                 GHS {filteredSpent.toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -445,11 +433,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Spending by Category</CardTitle>
-            <CardDescription className="text-xs">Category breakdown for recent expenses</CardDescription>
+            <CardTitle className="text-base font-semibold">Spending by Category ({filterLabel})</CardTitle>
+            <CardDescription className="text-xs">Category breakdown for filtered expenses</CardDescription>
           </CardHeader>
           <CardContent>
-            <SpendingCategoryChart categoryData={analytics?.byCategory ?? []} />
+            <SpendingCategoryChart categoryData={filteredCategoryData} />
           </CardContent>
         </Card>
 
@@ -512,7 +500,7 @@ export default function DashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">Recent Transactions</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Recent Transactions ({filterLabel})</h2>
             <Badge variant="outline" className="text-[10px]">
               {sortedTxns.length} items
             </Badge>
@@ -526,7 +514,7 @@ export default function DashboardPage() {
           <CardContent className="p-0 divide-y">
             {sortedTxns.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">
-                No transactions found for the selected time range ({timeFilter.replace("_", " ").toLowerCase()}).
+                No transactions found for the selected time range ({filterLabel.toLowerCase()}).
               </p>
             ) : (
               sortedTxns.slice(0, 8).map((txn: TransactionItem) => (
